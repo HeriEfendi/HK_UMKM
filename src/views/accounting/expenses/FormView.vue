@@ -87,27 +87,30 @@ export default {
     const accounts = ref([])
     
     const categories = [
+      'Makanan & Minuman',
+      'Transportasi & Bensin',
+      'Perawatan & Servis Kendaraan',
+      'Kebutuhan Rumah Tangga',
+      'Amal & Sosial',
+      'Hiburan & Liburan',
+      'Tagihan & Utilitas',
       'Sewa Tempat / Kios',
-      'Listrik, Air & Internet Toko',
-      'Gaji & Uang Makan Karyawan',
-      'Transportasi & Bensin Operasional',
-      'Kemasan, Plastik & Perlengkapan Toko',
+      'Listrik, Air & Internet',
+      'Perlengkapan Toko',
       'Bahan Baku / Modal Kulakan',
       'Pemasaran & Promosi',
       'Pajak & Retribusi Usaha',
-      'Perawatan & Servis Alat Usaha',
-      'Makanan & Minuman',
       'Lain-lain'
     ]
 
-    const selectedCategoryChoice = ref('Sewa Tempat / Kios')
+    const selectedCategoryChoice = ref('Makanan & Minuman')
     const customCategoryText = ref('')
 
     const form = ref({
       description: '',
       amount: null,
       date: new Date().toISOString().slice(0, 10),
-      category: 'Sewa Tempat / Kios',
+      category: 'Makanan & Minuman',
       accountId: null,
       savingTxId: null
     })
@@ -121,13 +124,13 @@ export default {
     const isEdit = computed(() => Boolean(route.params.id))
 
     const resetForm = () => {
-      selectedCategoryChoice.value = 'Sewa Tempat / Kios'
+      selectedCategoryChoice.value = 'Makanan & Minuman'
       customCategoryText.value = ''
       form.value = {
         description: '',
         amount: null,
         date: new Date().toISOString().slice(0, 10),
-        category: 'Sewa Tempat / Kios',
+        category: 'Makanan & Minuman',
         accountId: null,
         savingTxId: null
       }
