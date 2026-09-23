@@ -3,7 +3,7 @@
 
 pkgname=hk-umkm-bin
 _pkgname=hk-umkm
-pkgver=0.21.5
+pkgver=0.21.6
 pkgrel=1
 pkgdesc="Aplikasi Kasir & Pembukuan UMKM (Vue + Tauri)"
 arch=('x86_64')

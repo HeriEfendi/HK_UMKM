@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "HK UMKM",
-  "version": "0.21.5",
+  "version": "0.21.6",
   "identifier": "com.heri.projectapprealis",
   "build": {
     "frontendDist": "../dist",
