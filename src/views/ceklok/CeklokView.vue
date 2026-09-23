@@ -166,7 +166,7 @@
                     <h6 class="fw-bold text-dark mb-0">Grafik Harian Minggu Ini</h6>
                     <span class="badge bg-light text-muted border small">{{ weeklyPeriodRange }}</span>
                   </div>
-                  <VueApexCharts v-if="weeklyChartSeries.series[0].data.length > 0" :key="'weekly-' + logs.length" type="bar" height="240" :options="weeklyChartOptions" :series="weeklyChartSeries.series" />
+                  <VueApexCharts v-if="weeklyChartSeries.series[0].data.some(v => v > 0)" :key="'weekly-' + logs.length" type="bar" height="240" :options="weeklyChartOptions" :series="weeklyChartSeries.series" />
                   <div v-else class="text-center py-4 text-muted">Belum ada data untuk minggu ini.</div>
                 </ion-card-content>
               </ion-card>
@@ -179,7 +179,7 @@
                     <h6 class="fw-bold text-dark mb-0">Grafik Mingguan Bulan Ini</h6>
                     <span class="badge bg-light text-muted border small">{{ monthlyPeriodRange }}</span>
                   </div>
-                  <VueApexCharts v-if="monthlyChartSeries[0].data.length > 0" :key="'monthly-' + logs.length" type="area" height="240" :options="monthlyChartOptions" :series="monthlyChartSeries" />
+                  <VueApexCharts v-if="monthlyChartSeries[0].data.some(v => v > 0)" :key="'monthly-' + logs.length" type="area" height="240" :options="monthlyChartOptions" :series="monthlyChartSeries" />
                   <div v-else class="text-center py-4 text-muted">Belum ada data untuk bulan ini.</div>
                 </ion-card-content>
               </ion-card>
@@ -1368,7 +1368,7 @@ export default {
             return val > 0 ? `${h}.${String(m).padStart(2, '0')}` : '';
           },
           offsetY: -20,
-          style: { fontSize: '10px', colors: '#303030' }
+          style: { fontSize: '10px', colors: ['#303030'] }
         },
         xaxis: {
           categories: weeklyChartSeries.value.labels,

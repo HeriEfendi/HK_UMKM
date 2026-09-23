@@ -83,7 +83,7 @@
                   <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="fw-bold text-dark mb-0">Pembagian Status</h6>
                   </div>
-                  <div v-if="tasks.length > 0">
+                  <div v-if="tasks.length > 0 && statusChartSeries.some(v => v > 0)">
                     <VueApexCharts type="donut" height="240" :options="statusChartOptions" :series="statusChartSeries" />
                   </div>
                   <div v-else class="text-center py-4 text-muted">Belum ada data task.</div>
@@ -97,7 +97,7 @@
                   <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="fw-bold text-dark mb-0">Prioritas Task</h6>
                   </div>
-                  <div v-if="tasks.length > 0">
+                  <div v-if="tasks.length > 0 && priorityChartSeries[0].data.some(v => v > 0)">
                     <VueApexCharts type="bar" height="240" :options="priorityChartOptions" :series="priorityChartSeries" />
                   </div>
                   <div v-else class="text-center py-4 text-muted">Belum ada data prioritas.</div>

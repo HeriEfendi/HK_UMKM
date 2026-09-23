@@ -82,7 +82,7 @@
                     <h6 class="fw-bold text-dark mb-0">Distribusi Status</h6>
                     <span class="badge bg-light text-muted border small">Task</span>
                   </div>
-                  <div v-if="tasks.length > 0">
+                  <div v-if="tasks.length > 0 && statusChartSeries.some(v => v > 0)">
                     <VueApexCharts type="donut" height="260" :options="chartOptions" :series="statusChartSeries" />
                   </div>
                   <div v-else class="text-center py-4 text-muted">Tidak ada data task.</div>
@@ -97,7 +97,7 @@
                     <h6 class="fw-bold text-dark mb-0">Prioritas Task</h6>
                     <span class="badge bg-light text-muted border small">Count</span>
                   </div>
-                  <div v-if="tasks.length > 0">
+                  <div v-if="tasks.length > 0 && priorityChartSeries[0].data.some(v => v > 0)">
                     <VueApexCharts type="bar" height="260" :options="priorityChartOptions" :series="priorityChartSeries" />
                   </div>
                   <div v-else class="text-center py-4 text-muted">Tidak ada data prioritas.</div>

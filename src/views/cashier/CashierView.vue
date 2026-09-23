@@ -296,7 +296,7 @@
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
                   <h6 class="fw-bold text-dark mb-3">Grafik Penjualan 7 Hari Terakhir</h6>
-                  <div v-if="chartSeries[0].data.length > 0">
+                  <div v-if="chartSeries[0].data.some(v => v > 0)">
                     <VueApexCharts :key="'sales-chart-' + salesHistory.length" type="area" height="260" :options="chartOptions" :series="chartSeries" />
                   </div>
                   <div v-else class="text-center py-4 text-muted">
