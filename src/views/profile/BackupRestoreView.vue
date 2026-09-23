@@ -353,7 +353,7 @@ async function handleBackup() {
     }
 
     loadingMessage.value = 'Menyimpan file…';
-    const fileName = `FinancialApp_Backup_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `HK-UMKM_Backup_${new Date().toISOString().split('T')[0]}.xlsx`;
     await saveWorkbook(wb, fileName);
 
     if (skippedTables.length > 0) {
