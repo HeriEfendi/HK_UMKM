@@ -48,6 +48,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -74,6 +76,17 @@ jobs:
           (Get-Content src-tauri/tauri.conf.json) | ForEach-Object { $_ -replace '"version": ".*"', """version"": ""$VERSION""" } | Set-Content src-tauri/tauri.conf.json
           (Get-Content src-tauri/Cargo.toml) | ForEach-Object { $_ -replace '^version = ".*"', "version = ""$VERSION""" } | Set-Content src-tauri/Cargo.toml
 
+      - name: Generate Release Notes
+        id: release_notes
+        shell: bash
+        run: |
+          node scripts/generate-release-notes.mjs
+          {
+            echo 'body<<EOF'
+            cat release_notes.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
@@ -96,7 +109,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "App Release ${{ github.ref_name }}"
-          releaseBody: "Rilis otomatis untuk versi ${{ github.ref_name }}."
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

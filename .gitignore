@@ -29,3 +29,4 @@ release/*
 !release/.gitkeep
 android/release/*
 !android/release/.gitkeep
+release_notes.md
