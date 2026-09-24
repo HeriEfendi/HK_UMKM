@@ -500,7 +500,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, defineAsyncComponent } from 'vue'
+import { ref, onMounted, computed, defineAsyncComponent, watch, nextTick } from 'vue'
 import { 
   IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, 
   IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, 
@@ -532,6 +532,19 @@ export default {
     const loading = ref(false)
     const debts = ref([])
     
+    watch(activeTab, (tab) => {
+      if (tab === 'dashboard' || tab === 'analisa') {
+        nextTick(() => {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 50)
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 250)
+        })
+      }
+    })
+
     // Modals
     const isModalOpen = ref(false)
     const selectedDebtId = ref(null)
@@ -555,6 +568,11 @@ export default {
           const updated = debts.value.find(d => d.id === selectedDebtForPayment.value.id)
           if (updated) selectedDebtForPayment.value = updated
         }
+        nextTick(() => {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 100)
+        })
       } catch (err) {
         console.error('Error fetching debts:', err)
       } finally {

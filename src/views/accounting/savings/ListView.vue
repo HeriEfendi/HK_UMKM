@@ -110,7 +110,7 @@
         </div>
 
         <!-- ==================== TAB 2: TRANSACTIONS LIST ==================== -->
-        <div v-if="activeTab === 'mutasi'" class="ion-padding">
+        <div v-show="activeTab === 'mutasi'" class="ion-padding">
           <!-- Filters & Search -->
           <div class="mobile-card p-3 mb-3 mx-3">
             <div class="row g-2">
@@ -163,7 +163,7 @@
         </div>
 
         <!-- ==================== TAB 3: ANALYTICS & REPORTS ==================== -->
-        <div v-if="activeTab === 'analisa'" class="ion-padding">
+        <div v-show="activeTab === 'analisa'" class="ion-padding">
           <!-- Quick Statistics -->
           <div class="project-actions d-grid gap-2 mx-2 mb-3">
             <div class="mobile-card p-3 h-100">
@@ -335,7 +335,7 @@
 </template>
 
 <script>
-import { onMounted, ref, computed, defineAsyncComponent } from 'vue'
+import { onMounted, ref, computed, defineAsyncComponent, watch, nextTick } from 'vue'
 import { savingAccountsRepo, savingTransactionsRepo } from '../../../db/repositories'
 import { migrateOldSavings } from '../../../db/savingsMigration'
 import { onIonViewWillEnter } from '@ionic/vue'
@@ -364,6 +364,19 @@ export default {
     const showTxModal = ref(false)
     const showTransferModal = ref(false)
 
+    watch(activeTab, (tab) => {
+      if (tab === 'analisa') {
+        nextTick(() => {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 50)
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 250)
+        })
+      }
+    })
+
     // Data lists
     const accounts = ref([])
     const transactions = ref([])
@@ -387,6 +400,11 @@ export default {
         await migrateOldSavings()
         accounts.value = await savingAccountsRepo.getAll()
         transactions.value = await savingTransactionsRepo.getAll()
+        nextTick(() => {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 100)
+        })
       } catch (err) {
         console.error('Failed to load savings data:', err)
       } finally {

@@ -277,7 +277,7 @@
 </template>
 
 <script lang="ts">
-import { ref, computed, onMounted, reactive, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, reactive, defineAsyncComponent, watch, nextTick } from 'vue'
 import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonCardSubtitle, IonModal, IonButtons, IonCheckbox, IonSpinner, IonBadge, IonSelect, IonSelectOption, IonGrid, IonRow, IonCol, IonSegment, IonSegmentButton, IonLabel, IonAlert, IonFooter, onIonViewWillEnter } from '@ionic/vue';
 import { addOutline, trashOutline, closeOutline, searchOutline, calendarOutline, pencilOutline, ellipseOutline, timeOutline, checkmarkCircle } from 'ionicons/icons';
 import { TeamTodoRepository } from '../../db/teamTodoRepository'
@@ -306,6 +306,19 @@ export default {
     const confirmRevertTask = ref<any>(null)
     const formRef = ref<any>(null)
     const activeTab = ref('dashboard')
+
+    watch(activeTab, (tab) => {
+      if (tab === 'dashboard') {
+        nextTick(() => {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 50)
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 250)
+        })
+      }
+    })
 
     const snackbar = ref({ show: false, text: '', color: 'success' })
     const showToast = (text: string, color = 'success') => {
@@ -406,6 +419,11 @@ export default {
       loading.value = true
       try {
         tasks.value = await TeamTodoRepository.getAll()
+        nextTick(() => {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 100)
+        })
       } finally {
         loading.value = false
       }

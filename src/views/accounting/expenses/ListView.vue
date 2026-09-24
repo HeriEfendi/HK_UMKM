@@ -230,7 +230,7 @@
 </template>
 
 <script>
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent, watch, nextTick } from 'vue'
 import { onIonViewWillEnter, IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, alertController } from '@ionic/vue';
 import { addOutline, trashOutline, pencilOutline, createOutline } from 'ionicons/icons';
 import { expensesRepo, savingAccountsRepo, savingTransactionsRepo } from '../../../db/repositories'
@@ -254,16 +254,26 @@ export default {
     const budgetDraft = ref(null)
     const budgetCategoriesDraft = ref([])
 
+    watch(activeTab, (tab) => {
+      if (tab === 'dashboard') {
+        nextTick(() => {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 50)
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 250)
+        })
+      }
+    })
+
     // Filters
     const filterSearch = ref('')
     const filterCategory = ref('')
     const filterAccount = ref('')
 
     // Fetch All Data
-    const fetchAll = async () => {
-      expenses.value = await expensesRepo.getAll()
-      accounts.value = await savingAccountsRepo.getAll()
-
+    const fetchBudget = async () => {
       // Load budget limit
       const budgetRecord = await db.table('ceklok_settings').get('expense_budget')
       if (budgetRecord) {
@@ -271,6 +281,17 @@ export default {
       }
       const budgetCategoriesRecord = await db.table('ceklok_settings').get('expense_budget_categories')
       budgetCategories.value = Array.isArray(budgetCategoriesRecord?.value) ? budgetCategoriesRecord.value : []
+    }
+
+    const fetchAll = async () => {
+      expenses.value = await expensesRepo.getAll()
+      accounts.value = await savingAccountsRepo.getAll()
+      await fetchBudget()
+      nextTick(() => {
+        setTimeout(() => {
+          window.dispatchEvent(new Event('resize'))
+        }, 100)
+      })
     }
 
     const startEditBudget = () => {

@@ -308,7 +308,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent, watch, nextTick } from 'vue'
 import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonCardSubtitle, IonModal, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonAlert, IonFooter, IonGrid, IonRow, IonCol, IonBadge, onIonViewWillEnter } from '@ionic/vue';
 import { addOutline, trashOutline, closeOutline, searchOutline, calendarOutline, pencilOutline, ellipseOutline, timeOutline, checkmarkCircle } from 'ionicons/icons';
 import { TodoRepository } from '@/db/todoRepository'
@@ -330,6 +330,19 @@ const deleteId = ref<number | null>(null)
 const confirmRevertTask = ref<any>(null)
 const activeTab = ref('dashboard')
 
+watch(activeTab, (tab) => {
+  if (tab === 'dashboard') {
+    nextTick(() => {
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'))
+      }, 50)
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'))
+      }, 250)
+    })
+  }
+})
+
 const snackbar = ref({ show: false, text: '', color: 'success' })
 const showToast = (text: string, color: 'success' | 'error' = 'success') => {
   snackbar.value = { show: true, text, color }
@@ -342,6 +355,11 @@ const loadTasks = async () => {
   tasks.value = allTasks.filter(t => t.type === 'PERSONAL')
   updateMetrics()
   updateCharts()
+  nextTick(() => {
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'))
+    }, 100)
+  })
 }
 
 const metrics = ref({ total: 0, inProgress: 0, done: 0, dueToday: 0 })

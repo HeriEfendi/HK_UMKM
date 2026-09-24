@@ -260,7 +260,7 @@
 </template>
 
 <script>
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent, watch, nextTick } from 'vue'
 import { onIonViewWillEnter, IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, alertController } from '@ionic/vue';
 import { addOutline, trashOutline, createOutline } from 'ionicons/icons';
 import { incomesRepo, salesRepo, expensesRepo } from '../../../db/repositories'
@@ -282,10 +282,28 @@ export default {
     const filterCategory = ref('')
     const plPeriod = ref('this_month')
 
+    watch(activeTab, (tab) => {
+      if (tab === 'dashboard' || tab === 'labarugi') {
+        nextTick(() => {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 50)
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 250)
+        })
+      }
+    })
+
     const fetchAll = async () => {
       incomes.value = await incomesRepo.getAll()
       sales.value = await salesRepo.getAll()
       expenses.value = await expensesRepo.getAll()
+      nextTick(() => {
+        setTimeout(() => {
+          window.dispatchEvent(new Event('resize'))
+        }, 100)
+      })
     }
     
     const openModal = (id = null) => {

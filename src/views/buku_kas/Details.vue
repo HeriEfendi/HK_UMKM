@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onUnmounted, defineAsyncComponent, watch, nextTick } from 'vue'
 import * as XLSX from 'xlsx'
 import { useRoute } from 'vue-router'
 import { db } from '@/db/schema'
@@ -38,6 +38,20 @@ const route = useRoute()
 const project = ref<Project | null>(null)
 const loading = ref(false)
 const activeTab = ref('dashboard')
+const chartKey = ref(0)
+
+watch(activeTab, (newTab) => {
+  if (newTab === 'dashboard') {
+    nextTick(() => {
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'))
+      }, 50)
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'))
+      }, 250)
+    })
+  }
+})
 const txSearchQuery = ref('')
 const dialogTransaction = ref(false)
 const dialogDeleteTxId = ref<number | null>(null)
@@ -136,8 +150,8 @@ function getStatusColor(status: string) {
   return 'secondary'
 }
 
-async function fetchProject() {
-  loading.value = true
+async function fetchProject(silent = false) {
+  if (!silent) loading.value = true
   try {
     if (!db.isOpen()) await db.open()
     const projectId = Number(route.params.id)
@@ -157,11 +171,17 @@ async function fetchProject() {
       ;(found as any).panen_total = totals.panen_total
     }
     project.value = found || null
+    chartKey.value++
+    nextTick(() => {
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'))
+      }, 100)
+    })
   } catch(e) {
     console.error("Failed to fetch project:", e);
     showSnackbar('Gagal memuat data projek', 'error')
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
@@ -206,7 +226,7 @@ async function saveTransaction() {
       await db.table('projects').put(projectRecord)
     }
 
-    await fetchProject()
+    await fetchProject(true)
     closeDialog()
     showSnackbar('Transaksi berhasil disimpan!', 'success')
   } catch (e) {
@@ -235,7 +255,7 @@ async function deleteTransaction(id: number) {
         }
 
         dialogDeleteTxId.value = null
-        await fetchProject()
+        await fetchProject(true)
         showSnackbar('Transaksi berhasil dihapus', 'success')
     } catch {
         showSnackbar('Gagal menghapus transaksi', 'error');
@@ -381,7 +401,7 @@ async function processImportFile(result: ArrayBuffer) {
       await db.table('projects').put(projectRecord)
     }
 
-    await fetchProject()
+    await fetchProject(true)
 
     if (insertErrors.length > 0) {
       showSnackbar(
@@ -805,7 +825,7 @@ onUnmounted(() => clearInterval(interval))
                   <ion-card-content class="container-padded">
                     <h6 class="fw-bold text-dark mb-3">Arus Kas Bulanan</h6>
                     <VueApexCharts
-                      :key="'bar-' + cashFlowData.months.length"
+                      :key="'bar-' + chartKey"
                       type="bar" height="240"
                       :options="barOptions" :series="barSeries"
                     />
@@ -818,7 +838,7 @@ onUnmounted(() => clearInterval(interval))
                   <ion-card-content class="container-padded">
                     <h6 class="fw-bold text-dark mb-3">Pengeluaran per Kategori</h6>
                     <VueApexCharts
-                      :key="'donut-' + donutSeries.length"
+                      :key="'donut-' + chartKey"
                       type="donut" height="240"
                       :options="donutOptions" :series="donutSeries"
                     />

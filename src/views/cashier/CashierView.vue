@@ -707,7 +707,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, defineAsyncComponent } from 'vue'
+import { ref, onMounted, computed, defineAsyncComponent, watch, nextTick } from 'vue'
 import { ProductRepository, CategoryRepository, salesRepo, stockMutationsRepo } from '../../db/repositories'
 import { businessProfile, BusinessProfileRepository } from '../../db/businessProfile'
 import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonSegment, IonSegmentButton, IonLabel, IonButtons, IonBackButton, IonModal, IonAlert, toastController, IonGrid, IonRow, IonCol, IonCard, IonCardContent, onIonViewWillEnter } from '@ionic/vue';
@@ -730,6 +730,19 @@ export default {
     const categories = ref([])
     const salesHistory = ref([])
     
+    watch(activeTab, (tab) => {
+      if (tab === 'dashboard') {
+        nextTick(() => {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 50)
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 250)
+        })
+      }
+    })
+
     // POS/Cart states
     const searchQuery = ref('')
     const selectedCategory = ref('all')
@@ -770,6 +783,11 @@ export default {
       }))
       products.value = data
       salesHistory.value = (await salesRepo.getAll()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      nextTick(() => {
+        setTimeout(() => {
+          window.dispatchEvent(new Event('resize'))
+        }, 100)
+      })
     }
 
     onMounted(loadData)

@@ -502,7 +502,7 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, computed, defineAsyncComponent } from 'vue';
+import { ref, onMounted, onUnmounted, computed, defineAsyncComponent, watch, nextTick } from 'vue';
 import { onIonViewWillEnter } from '@ionic/vue';
 import { 
   IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton, IonTitle, IonButton,
@@ -532,6 +532,19 @@ export default {
     const logs = ref([]);
     const activeLog = ref(null);
     const activeBreak = ref(null);
+
+    watch(activeTab, (tab) => {
+      if (tab === 'dashboard') {
+        nextTick(() => {
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 50)
+          setTimeout(() => {
+            window.dispatchEvent(new Event('resize'))
+          }, 250)
+        })
+      }
+    });
 
     const getLocalDateString = (d = new Date()) => {
       const y = d.getFullYear();
