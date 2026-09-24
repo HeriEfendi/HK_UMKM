@@ -79,6 +79,8 @@ jobs:
       - name: Generate Release Notes
         id: release_notes
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           node scripts/generate-release-notes.mjs
           {

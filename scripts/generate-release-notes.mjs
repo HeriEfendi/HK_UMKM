@@ -1,7 +1,23 @@
 import { execSync } from 'node:child_process';
-import { writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 
-// Ambil versi dari environment GitHub Actions atau argumen atau package.json
+// Dapatkan repository URL & nama
+function getRepoName() {
+  if (process.env.GITHUB_REPOSITORY) {
+    return process.env.GITHUB_REPOSITORY;
+  }
+  try {
+    const remoteUrl = execSync('git remote get-url origin', { encoding: 'utf8' }).trim();
+    const match = remoteUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/);
+    if (match) return match[1];
+  } catch {}
+  return 'HeriEfendi/vue-capacitor-app';
+}
+
+const repo = getRepoName();
+const today = new Date().toISOString().split('T')[0];
+
+// Ambil tag saat ini
 let currentTag = process.env.GITHUB_REF_NAME || process.argv[2];
 if (!currentTag) {
   try {
@@ -12,19 +28,16 @@ if (!currentTag) {
   }
 }
 
-const repo = process.env.GITHUB_REPOSITORY || 'HeriEfendi/HK_UMKM';
-const today = new Date().toISOString().split('T')[0];
+console.log(`Generating Release Notes for ${currentTag} in repo ${repo}...`);
 
-console.log(`Generating Release Notes for ${currentTag}...`);
-
+// Dapatkan tag sebelumnya
 let prevTag = '';
 try {
-  // Coba cari tag sebelumnya
-  const gitDescribe = execSync(`git describe --tags --abbrev=0 "HEAD^" 2>/dev/null`, { encoding: 'utf8' }).trim();
+  const gitDescribe = execSync(`git describe --tags --abbrev=0 "${currentTag}^" 2>/dev/null || git describe --tags --abbrev=0 "HEAD^" 2>/dev/null`, { encoding: 'utf8' }).trim();
   if (gitDescribe && gitDescribe !== currentTag) {
     prevTag = gitDescribe;
   }
-} catch (e) {
+} catch {
   try {
     const tags = execSync(`git tag --sort=-creatordate`, { encoding: 'utf8' })
       .split('\n')
@@ -36,98 +49,106 @@ try {
     } else if (tags.length > 0 && tags[0] !== currentTag) {
       prevTag = tags[0];
     }
-  } catch (err) {
-    prevTag = '';
-  }
+  } catch {}
 }
 
-let commitLogs = '';
-try {
-  if (prevTag) {
-    commitLogs = execSync(`git log "${prevTag}"..HEAD --pretty=format:"%h|%s|%an" --no-merges`, { encoding: 'utf8' }).trim();
-  } else {
-    commitLogs = execSync(`git log -n 30 --pretty=format:"%h|%s|%an" --no-merges`, { encoding: 'utf8' }).trim();
-  }
-} catch (e) {
-  try {
-    commitLogs = execSync(`git log -n 20 --pretty=format:"%h|%s|%an" --no-merges`, { encoding: 'utf8' }).trim();
-  } catch (err) {
-    commitLogs = '';
-  }
-}
+console.log(`Current Tag: ${currentTag}, Previous Tag: ${prevTag || 'none'}`);
 
-const features = [];
-const fixes = [];
-const performance = [];
-const uiChanges = [];
-const refactor = [];
-const others = [];
+async function generate() {
+  let releaseBody = '';
 
-if (commitLogs) {
-  const lines = commitLogs.split('\n');
-  for (const line of lines) {
-    const parts = line.split('|');
-    const hash = parts[0];
-    const subject = parts[1];
-    const author = parts[2];
-    if (!subject) continue;
+  // 1. Coba gunakan GitHub API (Official Automatic Release Notes Generator) jika GITHUB_TOKEN ada
+  const token = process.env.GITHUB_TOKEN;
+  if (token) {
+    try {
+      console.log('Fetching official GitHub Release Notes via API...');
+      const payload = { tag_name: currentTag };
+      if (prevTag) payload.previous_tag_name = prevTag;
 
-    const entry = `- ${subject} (\`${hash}\` oleh @${author || 'contributor'})`;
-    const lower = subject.toLowerCase();
+      const res = await fetch(`https://api.github.com/repos/${repo}/releases/generate-notes`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'ReleaseNotesGenerator/1.0',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
 
-    if (lower.startsWith('feat') || lower.includes('fitur') || lower.includes('tambah') || lower.includes('implement')) {
-      features.push(entry);
-    } else if (lower.startsWith('fix') || lower.includes('bug') || lower.includes('perbaiki') || lower.includes('resolve')) {
-      fixes.push(entry);
-    } else if (lower.startsWith('perf') || lower.includes('optimi') || lower.includes('cepat') || lower.includes('speed')) {
-      performance.push(entry);
-    } else if (lower.startsWith('style') || lower.startsWith('ui') || lower.includes('tampilan') || lower.includes('icon') || lower.includes('theme')) {
-      uiChanges.push(entry);
-    } else if (lower.startsWith('refactor') || lower.startsWith('clean')) {
-      refactor.push(entry);
-    } else {
-      others.push(entry);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.body) {
+          console.log('Successfully fetched release notes from GitHub API!');
+          releaseBody = data.body;
+        }
+      } else {
+        console.warn(`GitHub API status: ${res.status} ${res.statusText}`);
+      }
+    } catch (err) {
+      console.warn('GitHub API request failed, falling back to git log parser:', err.message);
     }
   }
-}
 
-let markdown = `# 🚀 Rilis Aplikasi ${currentTag} (${today})\n\n`;
+  // 2. Fallback jika offline atau tanpa token: Parse langsung dari Git Log
+  if (!releaseBody) {
+    let commitLogs = '';
+    try {
+      if (prevTag) {
+        commitLogs = execSync(`git log "${prevTag}"..HEAD --pretty=format:"%H|%h|%s|%an"`, { encoding: 'utf8' }).trim();
+      } else {
+        commitLogs = execSync(`git log -n 30 --pretty=format:"%H|%h|%s|%an"`, { encoding: 'utf8' }).trim();
+      }
+    } catch {
+      try {
+        commitLogs = execSync(`git log -n 20 --pretty=format:"%H|%h|%s|%an"`, { encoding: 'utf8' }).trim();
+      } catch {}
+    }
 
-if (features.length > 0) {
-  markdown += `### ✨ Fitur Baru (New Features)\n`;
-  markdown += features.join('\n') + '\n\n';
-}
+    const meaningfulCommits = [];
+    const choreCommits = [];
 
-if (fixes.length > 0) {
-  markdown += `### 🐛 Perbaikan Bug (Bug Fixes)\n`;
-  markdown += fixes.join('\n') + '\n\n';
-}
+    if (commitLogs) {
+      const lines = commitLogs.split('\n');
+      for (const line of lines) {
+        const [fullHash, shortHash, subject, author] = line.split('|');
+        if (!subject) continue;
 
-if (performance.length > 0) {
-  markdown += `### ⚡ Performa & Optimasi (Performance)\n`;
-  markdown += performance.join('\n') + '\n\n';
-}
+        // Skip merge commits
+        if (subject.startsWith('Merge ') || subject.startsWith('Release v')) continue;
 
-if (uiChanges.length > 0) {
-  markdown += `### 🎨 Tampilan & UI (UI/UX)\n`;
-  markdown += uiChanges.join('\n') + '\n\n';
-}
+        const commitUrl = `https://github.com/${repo}/commit/${fullHash}`;
+        const entry = `* ${subject} ([${shortHash}](${commitUrl}))`;
 
-if (refactor.length > 0) {
-  markdown += `### ♻️ Refactoring & Pembersihan Kode\n`;
-  markdown += refactor.join('\n') + '\n\n';
-}
+        const lower = subject.toLowerCase();
+        // Pisahkan jika sekadar bump version
+        if (lower.startsWith('bump version')) {
+          choreCommits.push(entry);
+        } else {
+          meaningfulCommits.push(entry);
+        }
+      }
+    }
 
-if (others.length > 0) {
-  markdown += `### 🔧 Pemeliharaan & Pembaruan Lainnya\n`;
-  markdown += others.join('\n') + '\n\n';
-}
+    const commitsToDisplay = meaningfulCommits.length > 0 ? meaningfulCommits : choreCommits;
 
-if (!commitLogs || (features.length === 0 && fixes.length === 0 && performance.length === 0 && uiChanges.length === 0 && refactor.length === 0 && others.length === 0)) {
-  markdown += `Pembaruan dan peningkatan stabilitas untuk versi **${currentTag}**.\n\n`;
-}
+    releaseBody = `## What's Changed\n`;
+    if (commitsToDisplay.length > 0) {
+      releaseBody += commitsToDisplay.join('\n') + '\n\n';
+    } else {
+      releaseBody += `* Pembaruan dan perbaikan stabilitas aplikasi pada rilis ${currentTag}.\n\n`;
+    }
 
-markdown += `---
+    if (prevTag) {
+      releaseBody += `**Full Changelog**: https://github.com/${repo}/compare/${prevTag}...${currentTag}\n`;
+    } else {
+      releaseBody += `**Riwayat Komit**: https://github.com/${repo}/commits/${currentTag}\n`;
+    }
+  }
+
+  // 3. Tambahkan Panduan Unduhan Paket Aplikasi di bagian bawah
+  const downloadSection = `
+---
 
 ### 📦 Panduan Unduhan Paket Aplikasi
 | Platform | Ekstensi / Format | Rekomendasi Sistem |
@@ -137,15 +158,13 @@ markdown += `---
 | **Ubuntu / Debian** | \`.deb\` | Ubuntu 20.04+, Debian 11+ |
 | **Fedora / RHEL** | \`.rpm\` | Fedora 38+, Rocky Linux 9 |
 | **Arch Linux** | \`.pkg.tar.zst\` | Arch Linux, Manjaro, EndeavourOS |
-
----
 `;
 
-if (prevTag) {
-  markdown += `🔍 **Full Changelog**: https://github.com/${repo}/compare/${prevTag}...${currentTag}\n`;
-} else {
-  markdown += `🔍 **Riwayat Komit**: https://github.com/${repo}/commits/${currentTag}\n`;
+  const finalMarkdown = releaseBody.trim() + '\n' + downloadSection;
+
+  writeFileSync('release_notes.md', finalMarkdown, 'utf8');
+  console.log('Generated release_notes.md:');
+  console.log(finalMarkdown);
 }
 
-writeFileSync('release_notes.md', markdown, 'utf8');
-console.log('Successfully generated release_notes.md');
+generate();
