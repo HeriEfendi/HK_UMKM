@@ -178,15 +178,15 @@
 
           <!-- Trend Area Chart -->
           <div class="mobile-card container-padded mb-3">
-            <h6 class="fw-bold text-dark mb-3">Grafik Perkembangan Aset (6 Bulan Terakhir)</h6>
-            <VueApexCharts v-if="trendChartSeries[0].data.some(d => d > 0)" type="area" height="240" :options="trendChartOptions" :series="trendChartSeries" />
+            <h6 class="fw-bold text-dark mb-2">Grafik Perkembangan Aset (6 Bulan Terakhir)</h6>
+            <v-chart v-if="hasTrendData" :option="trendChartOption" autoresize style="height: 240px; width: 100%;" />
             <div v-else class="text-center py-5 text-muted">Belum ada mutasi dana untuk menampilkan grafik perkembangan.</div>
           </div>
 
           <!-- Distribution Donut Chart -->
           <div class="mobile-card container-padded mb-3">
-            <h6 class="fw-bold text-dark mb-3">Distribusi Aset Tabungan</h6>
-            <VueApexCharts v-if="distributionChartSeries.length > 0 && distributionChartSeries.some(d => d > 0)" type="donut" height="240" :options="distributionChartOptions" :series="distributionChartSeries" />
+            <h6 class="fw-bold text-dark mb-2">Distribusi Aset Tabungan</h6>
+            <v-chart v-if="hasDistributionData" :option="distributionChartOption" autoresize style="height: 240px; width: 100%;" />
             <div v-else class="text-center py-5 text-muted">Tambahkan saldo di akun Anda untuk melihat distribusi aset.</div>
           </div>
         </div>
@@ -347,14 +347,13 @@ import {
   addOutline, trashOutline, pencilOutline, swapHorizontalOutline, arrowUpOutline,
   arrowDownOutline, walletOutline, closeOutline
 } from 'ionicons/icons';
-
-const VueApexCharts = defineAsyncComponent(() => import("vue3-apexcharts"));
+import { CHART_PALETTE, formatIDR, formatCompactNumber, getModernTooltip, getDonutTooltip, createAreaGradient } from '../../../utils/chartThemes'
 
 export default {
   name: 'AccountingSavingsListView',
   components: {
     IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons,
-    IonSegment, IonSegmentButton, IonLabel, IonSpinner, IonModal, VueApexCharts
+    IonSegment, IonSegmentButton, IonLabel, IonSpinner, IonModal
   },
   setup() {
     // State UI
@@ -663,15 +662,17 @@ export default {
     })
 
     // Net Worth Trend Calculation (6 Months)
-    const trendChartSeries = computed(() => {
+    const trendChartOption = computed(() => {
       const data = []
+      const categories = []
       const now = new Date()
       
-      // Calculate net worth at the end of each of the last 6 months
       for (let i = 5; i >= 0; i--) {
-        const targetMonthDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 0) // End of target month
-        
-        // Net worth up to this targetMonthDate
+        const m = new Date()
+        m.setMonth(m.getMonth() - (5 - i))
+        categories.push(m.toLocaleDateString('id-ID', { month: 'short' }))
+
+        const targetMonthDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 0)
         const balanceUpToMonth = transactions.value
           .filter(t => new Date(t.date || t.createdAt) <= targetMonthDate)
           .reduce((sum, t) => {
@@ -682,51 +683,79 @@ export default {
         
         data.push(balanceUpToMonth)
       }
-      
-      return [{ name: 'Aset Bersih', data }]
-    })
 
-    const trendChartOptions = {
-      chart: { toolbar: { show: false }, type: 'area', zoom: { enabled: false } },
-      colors: ['#0d9488'],
-      stroke: { curve: 'smooth', width: 2 },
-      dataLabels: { enabled: false },
-      fill: {
-        type: 'gradient',
-        gradient: {
-          shadeIntensity: 1,
-          opacityFrom: 0.45,
-          opacityTo: 0.05,
-          stops: [0, 100]
-        }
-      },
-      xaxis: {
-        categories: Array.from({ length: 6 }, (_, i) => {
-          const m = new Date()
-          m.setMonth(m.getMonth() - (5 - i))
-          return m.toLocaleDateString('id-ID', { month: 'short' })
-        })
-      },
-      yaxis: { labels: { formatter: (val) => new Intl.NumberFormat('id-ID', { notation: 'compact' }).format(val) } }
-    }
-
-    // Account Asset Distribution
-    const distributionChartSeries = computed(() => {
-      return accountsWithBalance.value.map(acc => Math.max(0, acc.balance))
-    })
-
-    const distributionChartOptions = computed(() => {
       return {
-        chart: { type: 'donut', toolbar: { show: false } },
-        labels: accountsWithBalance.value.map(acc => acc.name),
-        colors: ['#0d9488', '#4f46e5', '#f59e0b', '#8b5cf6', '#10b981', '#6366f1'],
-        legend: { position: 'bottom' },
-        stroke: { width: 0 },
-        tooltip: {
-          y: { formatter: (val) => formatPrice(val) }
-        }
+        color: ['#0d9488'],
+        tooltip: getModernTooltip((params) => {
+          const item = Array.isArray(params) ? params[0] : params
+          return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
+          <div style="color:#2dd4bf;font-weight:bold;">${formatIDR(item?.value || 0)}</div>`
+        }),
+        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: categories,
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: { color: '#64748b', fontSize: 10, formatter: (val) => formatCompactNumber(val) }
+        },
+        series: [{
+          name: 'Aset Bersih',
+          type: 'line',
+          smooth: 0.35,
+          showSymbol: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: { width: 3, color: '#0d9488' },
+          itemStyle: { color: '#0d9488', borderColor: '#ffffff', borderWidth: 2 },
+          areaStyle: { color: createAreaGradient('#0d9488') },
+          data
+        }]
       }
     })
+
+    const hasTrendData = computed(() => trendChartOption.value.series[0].data.some(d => d > 0))
+
+    // Account Asset Distribution
+    const distributionChartOption = computed(() => {
+      const data = accountsWithBalance.value
+        .filter(acc => acc.balance > 0)
+        .map(acc => ({ name: acc.name, value: acc.balance }))
+
+      return {
+        color: CHART_PALETTE,
+        tooltip: getDonutTooltip('Rp'),
+        legend: {
+          bottom: 0,
+          left: 'center',
+          icon: 'circle',
+          itemWidth: 8,
+          itemHeight: 8,
+          textStyle: { color: '#64748b', fontSize: 11 }
+        },
+        series: [{
+          name: 'Distribusi Aset',
+          type: 'pie',
+          radius: ['45%', '72%'],
+          center: ['50%', '42%'],
+          avoidLabelOverlap: true,
+          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false },
+          emphasis: {
+            scale: true,
+            label: { show: true, fontSize: 12, fontWeight: 'bold', formatter: '{b}\n{d}%' }
+          },
+          data
+        }]
+      }
+    })
+
+    const hasDistributionData = computed(() => accountsWithBalance.value.some(acc => acc.balance > 0))
 
     return {
       activeTab, loading, showAccountModal, showTxModal, showTransferModal,
@@ -736,7 +765,7 @@ export default {
       filteredTransactions, getAccountName, openAccountModal, saveAccount,
       onDeleteAccount, openTxModal, saveTransaction, onDeleteTransaction,
       openTransferModal, availableDestinationAccounts, saveTransfer,
-      stats, trendChartSeries, trendChartOptions, distributionChartSeries, distributionChartOptions,
+      stats, trendChartOption, hasTrendData, distributionChartOption, hasDistributionData,
       getCategoryBadgeClass, getCategoryBorderClass,
       addOutline, trashOutline, pencilOutline, swapHorizontalOutline, arrowUpOutline,
       arrowDownOutline, walletOutline, closeOutline

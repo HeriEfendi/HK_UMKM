@@ -181,17 +181,15 @@
               <ion-col size="12" size-md="7">
                 <ion-card class="mobile-card m-0 h-100">
                   <ion-card-content class="container-padded">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
                       <h6 class="fw-bold text-dark mb-0">5 Utang Terbesar (Sisa Pokok)</h6>
                       <span class="badge bg-light text-muted border text-xs">Pemberi Utang</span>
                     </div>
-                    <VueApexCharts 
-                      v-if="topDebtsChartSeries[0].data.some(v => v > 0)"
-                      :key="'top-' + debts.length"
-                      type="bar" 
-                      height="240" 
-                      :options="topDebtsChartOptions" 
-                      :series="topDebtsChartSeries" 
+                    <v-chart 
+                      v-if="hasTopDebtsData"
+                      :option="topDebtsChartOption" 
+                      autoresize
+                      style="height: 240px; width: 100%;"
                     />
                     <div v-else class="text-center py-4 text-muted text-sm">Belum ada data utang aktif untuk ditampilkan.</div>
                   </ion-card-content>
@@ -202,17 +200,15 @@
               <ion-col size="12" size-md="5">
                 <ion-card class="mobile-card m-0 h-100">
                   <ion-card-content class="container-padded">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
                       <h6 class="fw-bold text-dark mb-0">Status Pelunasan</h6>
                       <span class="badge bg-light text-muted border text-xs">Proporsi</span>
                     </div>
-                    <VueApexCharts 
-                      v-if="statusDonutSeries.some(v => v > 0)"
-                      :key="'donut-' + debts.length"
-                      type="donut" 
-                      height="240" 
-                      :options="statusDonutOptions" 
-                      :series="statusDonutSeries" 
+                    <v-chart 
+                      v-if="hasStatusDonutData"
+                      :option="statusDonutOption" 
+                      autoresize
+                      style="height: 240px; width: 100%;"
                     />
                     <div v-else class="text-center py-4 text-muted text-sm">Belum ada data status.</div>
                   </ion-card-content>
@@ -436,13 +432,11 @@
                         <small class="text-muted text-xs">Distribusi akumulasi utang berdasarkan bulan jatuh tempo</small>
                       </div>
                     </div>
-                    <VueApexCharts 
-                      v-if="dueTrendChartSeries[0].data.some(v => v > 0)"
-                      :key="'trend-' + debts.length"
-                      type="area" 
-                      height="260" 
-                      :options="dueTrendChartOptions" 
-                      :series="dueTrendChartSeries" 
+                    <v-chart 
+                      v-if="hasDueTrendData"
+                      :option="dueTrendChartOption" 
+                      autoresize
+                      style="height: 260px; width: 100%;"
                     />
                     <div v-else class="text-center py-4 text-muted text-sm">Belum ada data trend jatuh tempo.</div>
                   </ion-card-content>
@@ -516,8 +510,7 @@ import { debtsRepo } from '../../../db/repositories'
 import { businessProfile } from '../../../db/businessProfile'
 import DebtModal from './DebtModal.vue'
 import DebtPaymentModal from './DebtPaymentModal.vue'
-
-const VueApexCharts = defineAsyncComponent(() => import("vue3-apexcharts"))
+import { CHART_PALETTE, formatIDR, formatCompactNumber, getModernTooltip, getDonutTooltip, createAreaGradient } from '../../../utils/chartThemes'
 
 export default {
   name: 'AccountingDebtsListView',
@@ -525,7 +518,7 @@ export default {
     IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, 
     IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, 
     IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonSpinner, 
-    DebtModal, DebtPaymentModal, VueApexCharts 
+    DebtModal, DebtPaymentModal
   },
   setup() {
     const activeTab = ref('dashboard')
@@ -855,49 +848,90 @@ export default {
       }]
     })
 
-    const topDebtsChartOptions = computed(() => {
+    // Chart 1: Top 5 Debts
+    const topDebtsChartOption = computed(() => {
       const top5 = [...debts.value]
         .filter(d => !isDebtPaid(d))
-        .sort((a, b) => getRemainingAmount(b) - getRemainingAmount(a))
-        .slice(0, 5)
+        .sort((a, b) => getRemainingAmount(a) - getRemainingAmount(b))
+        .slice(-5)
 
       return {
-        chart: { toolbar: { show: false } },
-        colors: ['#3b82f6'],
-        plotOptions: { bar: { borderRadius: 6, horizontal: true } },
-        dataLabels: { enabled: false },
-        xaxis: {
-          categories: top5.map(d => d.lender || 'Tanpa Nama'),
-          labels: {
-            formatter: (val) => 'Rp' + (val / 1000).toLocaleString('id-ID') + 'k'
-          }
+        color: ['#3b82f6'],
+        tooltip: getModernTooltip((params) => {
+          const item = Array.isArray(params) ? params[0] : params
+          return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
+          <div style="color:#60a5fa;font-weight:bold;">${formatPrice(item?.value || 0)}</div>`
+        }),
+        grid: { top: '6%', left: '3%', right: '8%', bottom: '6%', containLabel: true },
+        xAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: { color: '#64748b', fontSize: 10, formatter: (val) => formatCompactNumber(val) }
         },
-        tooltip: {
-          y: { formatter: (val) => formatPrice(val) }
-        }
+        yAxis: {
+          type: 'category',
+          data: top5.map(d => d.lender || 'Tanpa Nama'),
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+        },
+        series: [{
+          name: 'Sisa Utang',
+          type: 'bar',
+          barMaxWidth: 16,
+          itemStyle: { borderRadius: [0, 4, 4, 0], color: '#3b82f6' },
+          data: top5.map(d => getRemainingAmount(d))
+        }]
       }
     })
 
-    // Chart 2: Status Donut
-    const statusDonutSeries = computed(() => {
-      return [
-        summary.value.unpaidCount - summary.value.installmentCount,
-        summary.value.installmentCount,
-        summary.value.paidCount,
-        overdueDebtsCount.value
-      ]
+    const hasTopDebtsData = computed(() => {
+      return debts.value.some(d => !isDebtPaid(d) && getRemainingAmount(d) > 0)
     })
 
-    const statusDonutOptions = computed(() => ({
-      chart: { type: 'donut' },
-      colors: ['#f59e0b', '#3b82f6', '#10b981', '#ef4444'],
-      labels: ['Belum Dicicil', 'Sedang Dicicil', 'Sudah Lunas', 'Terlewat'],
-      legend: { position: 'bottom' },
-      dataLabels: { enabled: true }
-    }))
+    // Chart 2: Status Donut
+    const statusDonutOption = computed(() => {
+      const data = [
+        { name: 'Belum Dicicil', value: Math.max(0, summary.value.unpaidCount - summary.value.installmentCount) },
+        { name: 'Sedang Dicicil', value: summary.value.installmentCount },
+        { name: 'Sudah Lunas', value: summary.value.paidCount },
+        { name: 'Terlewat', value: overdueDebtsCount.value }
+      ].filter(item => item.value > 0)
+
+      return {
+        color: ['#f59e0b', '#3b82f6', '#10b981', '#ef4444'],
+        tooltip: getDonutTooltip('Utang'),
+        legend: {
+          bottom: 0,
+          left: 'center',
+          icon: 'circle',
+          itemWidth: 8,
+          itemHeight: 8,
+          textStyle: { color: '#64748b', fontSize: 11 }
+        },
+        series: [{
+          name: 'Status Utang',
+          type: 'pie',
+          radius: ['45%', '72%'],
+          center: ['50%', '42%'],
+          avoidLabelOverlap: true,
+          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false },
+          emphasis: {
+            scale: true,
+            label: { show: true, fontSize: 12, fontWeight: 'bold', formatter: '{b}\n{c} ({d}%)' }
+          },
+          data
+        }]
+      }
+    })
+
+    const hasStatusDonutData = computed(() => {
+      return (summary.value.unpaidCount + summary.value.paidCount) > 0
+    })
 
     // Chart 3: Due Date Trend (Area)
-    const dueTrendChartSeries = computed(() => {
+    const dueTrendChartOption = computed(() => {
       const monthMap = {}
       debts.value.forEach(d => {
         if (!d.dueDate) return
@@ -910,31 +944,43 @@ export default {
       const categories = Object.keys(monthMap)
       const data = categories.map(k => monthMap[k])
 
-      return [{
-        name: 'Target Pelunasan',
-        data
-      }]
+      return {
+        color: ['#6366f1'],
+        tooltip: getModernTooltip((params) => {
+          const item = Array.isArray(params) ? params[0] : params
+          return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
+          <div style="color:#a5b4fc;font-weight:bold;">${formatPrice(item?.value || 0)}</div>`
+        }),
+        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: categories,
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: { color: '#64748b', fontSize: 10, formatter: (val) => formatCompactNumber(val) }
+        },
+        series: [{
+          name: 'Target Pelunasan',
+          type: 'line',
+          smooth: 0.35,
+          showSymbol: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: { width: 3, color: '#6366f1' },
+          itemStyle: { color: '#6366f1', borderColor: '#ffffff', borderWidth: 2 },
+          areaStyle: { color: createAreaGradient('#6366f1') },
+          data
+        }]
+      }
     })
 
-    const dueTrendChartOptions = computed(() => {
-      const monthMap = {}
-      debts.value.forEach(d => {
-        if (!d.dueDate) return
-        const date = new Date(d.dueDate)
-        if (isNaN(date.getTime())) return
-        const key = date.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' })
-        monthMap[key] = (monthMap[key] || 0) + getRemainingAmount(d)
-      })
-
-      return {
-        chart: { type: 'area', toolbar: { show: false } },
-        colors: ['#6366f1'],
-        stroke: { curve: 'smooth', width: 3 },
-        fill: { type: 'gradient', colors: ['#6366f1'], gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05 } },
-        xaxis: { categories: Object.keys(monthMap) },
-        yaxis: { labels: { formatter: (val) => 'Rp' + (val / 1000).toLocaleString('id-ID') + 'k' } },
-        tooltip: { y: { formatter: (val) => formatPrice(val) } }
-      }
+    const hasDueTrendData = computed(() => {
+      return Object.values(dueTrendChartOption.value.series[0]?.data || []).some(v => v > 0)
     })
 
     const remindViaWhatsApp = (debt) => {
@@ -961,9 +1007,9 @@ export default {
       isPaymentModalOpen, selectedDebtForPayment,
       searchQuery, statusFilter, typeFilter, sortBy, filteredDebts,
       summary, overdueDebtsCount, paidPercentage, scheduledDebts,
-      topDebtsChartSeries, topDebtsChartOptions,
-      statusDonutSeries, statusDonutOptions,
-      dueTrendChartSeries, dueTrendChartOptions,
+      topDebtsChartOption, hasTopDebtsData,
+      statusDonutOption, hasStatusDonutData,
+      dueTrendChartOption, hasDueTrendData,
       fetchAll, openModal, openPaymentModal, onDelete, togglePaidStatus,
       isDebtPaid, isPartiallyPaid, getPaidAmount, getRemainingAmount, getProgressPercent,
       getCardBorderClass, getStatusBadgeClass, getStatusText, getDueDateColorClass,

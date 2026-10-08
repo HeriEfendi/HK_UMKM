@@ -82,8 +82,8 @@
                     <h6 class="fw-bold text-dark mb-0">Distribusi Status</h6>
                     <span class="badge bg-light text-muted border small">Task</span>
                   </div>
-                  <div v-if="tasks.length > 0 && statusChartSeries.some(v => v > 0)">
-                    <VueApexCharts type="donut" height="260" :options="chartOptions" :series="statusChartSeries" />
+                  <div v-if="hasStatusData">
+                    <v-chart :option="statusDonutOption" autoresize style="height: 250px; width: 100%;" />
                   </div>
                   <div v-else class="text-center py-4 text-muted">Tidak ada data task.</div>
                 </ion-card-content>
@@ -93,12 +93,12 @@
             <ion-col size="12" size-lg="6">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="fw-bold text-dark mb-0">Prioritas Task</h6>
                     <span class="badge bg-light text-muted border small">Count</span>
                   </div>
-                  <div v-if="tasks.length > 0 && priorityChartSeries[0].data.some(v => v > 0)">
-                    <VueApexCharts type="bar" height="260" :options="priorityChartOptions" :series="priorityChartSeries" />
+                  <div v-if="hasPriorityData">
+                    <v-chart :option="priorityChartOption" autoresize style="height: 250px; width: 100%;" />
                   </div>
                   <div v-else class="text-center py-4 text-muted">Tidak ada data prioritas.</div>
                 </ion-card-content>
@@ -288,12 +288,11 @@ import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import * as XLSX from 'xlsx';
-
-const VueApexCharts = defineAsyncComponent(() => import('vue3-apexcharts'))
+import { getModernTooltip, getDonutTooltip } from '@/utils/chartThemes';
 
 export default {
   name: 'TodoListView',
-  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonCardSubtitle, IonModal, IonButtons, IonCheckbox, IonSpinner, IonBadge, IonSelect, IonSelectOption, IonGrid, IonRow, IonCol, FormView, VueApexCharts, IonSegment, IonSegmentButton, IonLabel, IonAlert, IonFooter, AppToast },
+  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonCardSubtitle, IonModal, IonButtons, IonCheckbox, IonSpinner, IonBadge, IonSelect, IonSelectOption, IonGrid, IonRow, IonCol, FormView, IonSegment, IonSegmentButton, IonLabel, IonAlert, IonFooter, AppToast },
   setup() {
     const tasks = ref<any[]>([])
     const loading = ref(false)
@@ -510,7 +509,9 @@ export default {
       return { total: tasks.value.length, overdue, dueToday, done, avgPoints }
     })
 
-    const statusChartSeries = computed(() => {
+    const hasStatusData = computed(() => tasks.value.length > 0)
+
+    const statusDonutOption = computed(() => {
       const groups: Record<string, number> = { 'TO DO': 0, 'IN PROGRESS': 0, DONE: 0, OVERDUE: 0 }
       const today = new Date().toISOString().split('T')[0]
       tasks.value.forEach(task => {
@@ -520,32 +521,78 @@ export default {
           groups[task.status] = (groups[task.status] || 0) + 1
         }
       })
-      return [groups['TO DO'], groups['IN PROGRESS'], groups.DONE, groups.OVERDUE]
+
+      const data = [
+        { name: 'TO DO', value: groups['TO DO'] },
+        { name: 'IN PROGRESS', value: groups['IN PROGRESS'] },
+        { name: 'DONE', value: groups.DONE },
+        { name: 'OVERDUE', value: groups.OVERDUE }
+      ].filter(item => item.value > 0)
+
+      return {
+        color: ['#3b82f6', '#f59e0b', '#10b981', '#ef4444'],
+        tooltip: getDonutTooltip('Task'),
+        legend: {
+          bottom: 0,
+          left: 'center',
+          icon: 'circle',
+          itemWidth: 8,
+          itemHeight: 8,
+          textStyle: { color: '#64748b', fontSize: 11 }
+        },
+        series: [{
+          name: 'Status Task',
+          type: 'pie',
+          radius: ['45%', '72%'],
+          center: ['50%', '42%'],
+          avoidLabelOverlap: true,
+          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false },
+          emphasis: {
+            scale: true,
+            label: { show: true, fontSize: 12, fontWeight: 'bold', formatter: '{b}\n{c} ({d}%)' }
+          },
+          data
+        }]
+      }
     })
 
-    const priorityChartSeries = computed(() => {
+    const hasPriorityData = computed(() => tasks.value.length > 0)
+
+    const priorityChartOption = computed(() => {
       const counts: Record<string, number> = { Highest: 0, High: 0, Medium: 0, Low: 0 }
       tasks.value.forEach(task => { counts[task.priority || 'Medium'] = (counts[task.priority || 'Medium'] || 0) + 1 })
-      return [{ name: 'Prioritas', data: [counts.Highest, counts.High, counts.Medium, counts.Low] }]
+
+      return {
+        color: ['#6366f1'],
+        tooltip: getModernTooltip((params: any) => {
+          const item = Array.isArray(params) ? params[0] : params
+          return `<div style="font-weight:600;margin-bottom:4px;">Prioritas: ${item?.name || ''}</div>
+          <div style="color:#a5b4fc;font-weight:bold;">${item?.value || 0} Task</div>`
+        }),
+        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: ['Highest', 'High', 'Medium', 'Low'],
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+        },
+        yAxis: {
+          type: 'value',
+          minInterval: 1,
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: { color: '#64748b', fontSize: 10 }
+        },
+        series: [{
+          name: 'Prioritas',
+          type: 'bar',
+          barMaxWidth: 24,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: '#6366f1' },
+          data: [counts.Highest, counts.High, counts.Medium, counts.Low]
+        }]
+      }
     })
-
-    const chartOptions = computed(() => ({
-      chart: { type: 'donut' as const, toolbar: { show: false } },
-      labels: ['TO DO', 'IN PROGRESS', 'DONE', 'OVERDUE'],
-      legend: { position: 'bottom' as const, horizontalAlign: 'center' as const },
-      colors: ['#3b82f6', '#f59e0b', '#10b981', '#ef4444'],
-      dataLabels: { enabled: true, formatter: (val: number) => `${Math.round(val)}%` },
-      responsive: [{ breakpoint: 768, options: { chart: { width: '100%' as const }, legend: { position: 'bottom' as const } } }]
-    }))
-
-    const priorityChartOptions = computed(() => ({
-      chart: { type: 'bar' as const, toolbar: { show: false } },
-      plotOptions: { bar: { borderRadius: 8 } },
-      xaxis: { categories: ['Highest', 'High', 'Medium', 'Low'] },
-      colors: ['#6366f1'],
-      dataLabels: { enabled: false },
-      yaxis: { labels: { formatter: (val: number) => `${val}` } }
-    }))
 
     const refreshTasks = async () => {
       await fetchTasks()
@@ -643,10 +690,10 @@ export default {
       cycleStatus,
       performRevert,
       metrics,
-      statusChartSeries,
-      priorityChartSeries,
-      chartOptions,
-      priorityChartOptions,
+      statusDonutOption,
+      hasStatusData,
+      priorityChartOption,
+      hasPriorityData,
       refreshTasks,
       formatDate,
       exportExcel,

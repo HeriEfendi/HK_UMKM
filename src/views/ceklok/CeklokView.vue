@@ -162,11 +162,11 @@
             <ion-col size="12" size-sm="6" size-lg="6">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="fw-bold text-dark mb-0">Grafik Harian Minggu Ini</h6>
                     <span class="badge bg-light text-muted border small">{{ weeklyPeriodRange }}</span>
                   </div>
-                  <VueApexCharts v-if="weeklyChartSeries.series[0].data.some(v => v > 0)" :key="'weekly-' + logs.length" type="bar" height="240" :options="weeklyChartOptions" :series="weeklyChartSeries.series" />
+                  <v-chart v-if="hasWeeklyData" :option="weeklyChartOption" autoresize style="height: 240px; width: 100%;" />
                   <div v-else class="text-center py-4 text-muted">Belum ada data untuk minggu ini.</div>
                 </ion-card-content>
               </ion-card>
@@ -175,11 +175,11 @@
             <ion-col size="12" size-sm="6" size-lg="6">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="fw-bold text-dark mb-0">Grafik Mingguan Bulan Ini</h6>
                     <span class="badge bg-light text-muted border small">{{ monthlyPeriodRange }}</span>
                   </div>
-                  <VueApexCharts v-if="monthlyChartSeries[0].data.some(v => v > 0)" :key="'monthly-' + logs.length" type="area" height="240" :options="monthlyChartOptions" :series="monthlyChartSeries" />
+                  <v-chart v-if="hasMonthlyData" :option="monthlyChartOption" autoresize style="height: 240px; width: 100%;" />
                   <div v-else class="text-center py-4 text-muted">Belum ada data untuk bulan ini.</div>
                 </ion-card-content>
               </ion-card>
@@ -516,15 +516,14 @@ import {
 } from 'ionicons/icons';
 import { CeklokRepository } from '@/db/ceklokRepository';
 import * as XLSX from 'xlsx';
-
-const VueApexCharts = defineAsyncComponent(() => import("vue3-apexcharts"));
+import { getModernTooltip, createAreaGradient } from '@/utils/chartThemes';
 
 export default {
   name: 'CeklokView',
   components: {
     IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton, IonTitle, IonButton,
     IonContent, IonSegment, IonSegmentButton, IonLabel, IonIcon, IonBadge, 
-    IonModal, IonAlert, VueApexCharts, IonFooter, IonGrid, IonRow, IonCol, IonCard, IonCardContent
+    IonModal, IonAlert, IonFooter, IonGrid, IonRow, IonCol, IonCard, IonCardContent
   },
   setup() {
     // Nav & States
@@ -1368,31 +1367,52 @@ export default {
       return { series: [{ name: 'Jam Kerja', data: data }], labels: labels };
     });
 
-    const weeklyChartOptions = computed(() => {
+    const formatHours = (val) => {
+      const h = Math.floor(val);
+      const m = Math.round((val % 1) * 60);
+      return `${h}j ${m > 0 ? m + 'm' : ''}`.trim() || '0 jam';
+    };
+
+    const hasWeeklyData = computed(() => {
+      return weeklyChartOption.value.series[0]?.data.some(v => v > 0);
+    });
+
+    const weeklyChartOption = computed(() => {
       return {
-        chart: { id: 'weekly-hours', toolbar: { show: false }, sparkline: { enabled: false } },
-        colors: ['#4f46e5'],
-        plotOptions: { bar: { borderRadius: 6, columnWidth: '50%', dataLabels: { position: 'top' } } },
-        dataLabels: {
-          enabled: true,
-          formatter: function (val) {
-            const h = Math.floor(val);
-            const m = Math.round((val % 1) * 60);
-            return val > 0 ? `${h}.${String(m).padStart(2, '0')}` : '';
-          },
-          offsetY: -20,
-          style: { fontSize: '10px', colors: ['#303030'] }
+        color: ['#6366f1'],
+        tooltip: getModernTooltip((params) => {
+          const item = Array.isArray(params) ? params[0] : params;
+          return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
+          <div style="color:#a5b4fc;font-weight:bold;">${formatHours(item?.value || 0)}</div>`;
+        }),
+        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: weeklyChartSeries.value.labels,
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
         },
-        xaxis: {
-          categories: weeklyChartSeries.value.labels,
-          labels: { style: { colors: '#64748b', fontWeight: 600 } }
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: { color: '#64748b', fontSize: 10 }
         },
-        yaxis: { labels: { style: { colors: '#64748b' } }, title: { text: 'Jam', style: { color: '#64748b' } } },
-        grid: { borderColor: '#e2e8f0', strokeDashArray: 4 }
+        series: [{
+          name: 'Jam Kerja',
+          type: 'bar',
+          barMaxWidth: 18,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: '#6366f1' },
+          data: weeklyChartSeries.value.series[0].data
+        }]
       };
     });
 
-    const monthlyChartSeries = computed(() => {
+    const hasMonthlyData = computed(() => {
+      return monthlyChartOption.value.series[0]?.data.some(v => v > 0);
+    });
+
+    const monthlyChartOption = computed(() => {
       const now = new Date();
       const baseMonth = now.getDate() <= settings.value.cutoffDate ? now.getMonth() - 1 : now.getMonth();
       const cutoff = settings.value.cutoffDate;
@@ -1413,95 +1433,49 @@ export default {
         }
       });
 
-      return [{
-        name: 'Total Jam',
-        data: data.map(v => Number.isFinite(v) ? Number(v.toFixed(2)) : 0)
-      }];
-    });
-
-    const monthlyChartOptions = computed(() => {
-      return {
-        chart: {
-          id: 'monthly-weeks',
-          toolbar: { show: false },
-          zoom: { enabled: false }
-        },
-        colors: ['#0d9488'],
-        stroke: {
-          curve: 'smooth',
-          width: 3
-        },
-        fill: {
-          type: 'gradient',
-          gradient: {
-            shadeIntensity: 1,
-            opacityFrom: 0.45,
-            opacityTo: 0.05,
-            stops: [0, 100]
-          }
-        },
-        xaxis: {
-          categories: Array.from({ length: 5 }, (_, i) => {
-            const now = new Date();
-            const baseMonth = now.getDate() <= settings.value.cutoffDate ? now.getMonth() - 1 : now.getMonth();
-            const cutoff = settings.value.cutoffDate;
-            const periodStart = new Date(now.getFullYear(), baseMonth, cutoff + 1);
-            const weekStart = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate() + (i * 7));
-            let weekEnd = new Date(weekStart);
-            if (i === 4) {
-              weekEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, cutoff);
-            } else {
-              weekEnd.setDate(weekStart.getDate() + 6);
-            }
-            return `${weekStart.getDate()} - ${weekEnd.getDate()}`;
-          }),
-          labels: { style: { colors: '#64748b', fontWeight: 600 } }
-        },
-        yaxis: {
-          labels: { 
-            style: { colors: '#64748b' },
-            formatter: (val) => val.toFixed(0)
-          }
-        },
-        grid: {
-          borderColor: '#e2e8f0',
-          strokeDashArray: 4
-        },
-        dataLabels: {
-          enabled: true,
-          formatter: function (val) {
-            const h = Math.floor(val);
-            const m = Math.round((val % 1) * 60);
-            return val > 0 ? `${h}.${String(m).padStart(2, '0')}` : '';
-          },
-        },
-        tooltip: {
-          y: {
-            formatter: function (val) {
-              const h = Math.floor(val);
-              const m = Math.round((val % 1) * 60);
-              return `${h}.${String(m).padStart(2, '0')} jam`;
-            }
-          },
-          title: {
-            formatter: function (seriesName, { dataPointIndex }) {
-              const i = dataPointIndex ?? 0;
-              const now = new Date();
-              const baseMonth = now.getDate() <= settings.value.cutoffDate ? now.getMonth() - 1 : now.getMonth();
-              const cutoff = settings.value.cutoffDate;
-              const periodStart = new Date(now.getFullYear(), baseMonth, cutoff + 1);
-              const weekStart = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate() + (i * 7));
-              let weekEnd;
-              if (i === 4) {
-                weekEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, cutoff);
-              } else {
-                weekEnd = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate() + (i * 7) + 6);
-              }
-              const fmt = (d) => `${d.getDate()} ${d.toLocaleString('id-ID', { month: 'short' })}`;
-              return `Mgg ${i + 1}: ${fmt(weekStart)} – ${fmt(weekEnd)}`;
-            }
-          }
+      const categories = Array.from({ length: 5 }, (_, i) => {
+        const weekStart = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate() + (i * 7));
+        let weekEnd = new Date(weekStart);
+        if (i === 4) {
+          weekEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, cutoff);
+        } else {
+          weekEnd.setDate(weekStart.getDate() + 6);
         }
+        return `${weekStart.getDate()} - ${weekEnd.getDate()}`;
+      });
+
+      return {
+        color: ['#0d9488'],
+        tooltip: getModernTooltip((params) => {
+          const item = Array.isArray(params) ? params[0] : params;
+          return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
+          <div style="color:#2dd4bf;font-weight:bold;">${formatHours(item?.value || 0)}</div>`;
+        }),
+        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: categories,
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: { color: '#64748b', fontSize: 10 }
+        },
+        series: [{
+          name: 'Total Jam',
+          type: 'line',
+          smooth: 0.35,
+          showSymbol: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: { width: 3, color: '#0d9488' },
+          itemStyle: { color: '#0d9488', borderColor: '#ffffff', borderWidth: 2 },
+          areaStyle: { color: createAreaGradient('#0d9488') },
+          data: data.map(v => Number.isFinite(v) ? Number(v.toFixed(2)) : 0)
+        }]
       };
     });
 
@@ -1560,10 +1534,10 @@ export default {
       totalMonthHours,
       daysWorkedThisMonth,
       avgDailyHours,
-      weeklyChartSeries,
-      weeklyChartOptions,
-      monthlyChartSeries,
-      monthlyChartOptions,
+      weeklyChartOption,
+      hasWeeklyData,
+      monthlyChartOption,
+      hasMonthlyData,
       weeklyPeriodRange,
       monthlyPeriodRange,
       settingsOutline, playOutline, stopOutline, cafeOutline, calendarOutline, 

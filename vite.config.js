@@ -20,7 +20,7 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules')) {
             if (id.includes('xlsx')) return 'xlsx';
-            if (id.includes('apexcharts')) return 'apexcharts';
+            if (id.includes('echarts') || id.includes('zrender')) return 'echarts';
             return 'vendor';
           }
         }

@@ -115,11 +115,11 @@
             <ion-col size="12" size-sm="6" size-lg="4">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="fw-bold text-dark mb-0">Pengeluaran Harian Minggu Ini</h6>
                     <span class="badge bg-light text-muted border small">Minggu Ini</span>
                   </div>
-                  <VueApexCharts v-if="dailyChartSeries[0].data.some(d => d > 0)" :key="'daily-' + expenses.length" type="bar" height="240" :options="dailyChartOptions" :series="dailyChartSeries" />
+                  <v-chart v-if="hasDailyData" :option="dailyChartOption" autoresize style="height: 240px; width: 100%;" />
                   <div v-else class="text-center py-4 text-muted">Belum ada data harian.</div>
                 </ion-card-content>
               </ion-card>
@@ -127,11 +127,11 @@
             <ion-col size="12" size-sm="6" size-lg="4">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="fw-bold text-dark mb-0">Trend Pengeluaran Mingguan</h6>
                     <span class="badge bg-light text-muted border small">5 Minggu Terakhir</span>
                   </div>
-                  <VueApexCharts v-if="weeklyChartSeries[0].data.some(d => d > 0)" :key="'weekly-' + expenses.length" type="area" height="240" :options="weeklyChartOptions" :series="weeklyChartSeries" />
+                  <v-chart v-if="hasWeeklyData" :option="weeklyChartOption" autoresize style="height: 240px; width: 100%;" />
                   <div v-else class="text-center py-4 text-muted">Belum ada data grafik mingguan.</div>
                 </ion-card-content>
               </ion-card>
@@ -139,11 +139,11 @@
             <ion-col size="12" size-sm="6" size-lg="4">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="fw-bold text-dark mb-0">Trend Pengeluaran Bulanan</h6>
                     <span class="badge bg-light text-muted border small">6 Bulan Terakhir</span>
                   </div>
-                  <VueApexCharts v-if="monthlyChartSeries[0].data.some(d => d > 0)" :key="'monthly-' + expenses.length" type="area" height="240" :options="monthlyChartOptions" :series="monthlyChartSeries" />
+                  <v-chart v-if="hasMonthlyData" :option="monthlyChartOption" autoresize style="height: 240px; width: 100%;" />
                   <div v-else class="text-center py-4 text-muted">Belum ada data bulanan.</div>
                 </ion-card-content>
               </ion-card>
@@ -151,7 +151,7 @@
             <ion-col size="12" size-sm="6" size-lg="4">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="fw-bold text-dark mb-0">Porsi Kategori</h6>
                     <select v-model="categoryPeriodMonths" @change.prevent style="outline: none !important; box-shadow: none !important;" class="form-select app-control app-control-sm w-auto">
                       <option :value="1">1 Bulan</option>
@@ -161,7 +161,7 @@
                     </select>
                   </div>
                   <div style="min-height: 240px;" class="d-flex flex-column justify-content-center">
-                    <VueApexCharts v-if="donutSeries.length > 0 && donutSeries.some(d => d > 0)" :key="'donut-' + donutSeries.length" type="donut" height="240" :options="donutOptions" :series="donutSeries" />
+                    <v-chart v-if="hasDonutData" :option="donutChartOption" autoresize style="height: 240px; width: 100%;" />
                     <div v-else class="text-center py-5 text-muted">Belum ada pengeluaran dalam {{ categoryPeriodMonths }} bulan terakhir untuk dianalisa.</div>
                   </div>
                 </ion-card-content>
@@ -236,12 +236,11 @@ import { addOutline, trashOutline, pencilOutline, createOutline } from 'ionicons
 import { expensesRepo, savingAccountsRepo, savingTransactionsRepo } from '../../../db/repositories'
 import { db } from '../../../db/schema'
 import { useRouter } from 'vue-router'
-
-const VueApexCharts = defineAsyncComponent(() => import("vue3-apexcharts"));
+import { CHART_PALETTE, formatIDR, formatCompactNumber, getModernTooltip, getDonutTooltip, createAreaGradient } from '../../../utils/chartThemes'
 
 export default {
   name: 'AccountingExpensesListView',
-  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, VueApexCharts },
+  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent },
   setup() {
     const router = useRouter()
     const activeTab = ref('dashboard')
@@ -418,20 +417,43 @@ export default {
        return totals
      })
 
-    const donutSeries = computed(() => Object.values(categoryTotals.value).map(v => Number.isFinite(v) ? Number(v) : 0))
-    const donutOptions = computed(() => ({
-      chart: { type: 'donut', toolbar: { show: false } },
-      labels: Object.keys(categoryTotals.value),
-      colors: ['#e11d48', '#f59e0b', '#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#6366f1', '#ec4899', '#14b8a6'],
-      legend: { position: 'bottom' },
-      stroke: { width: 0 },
-      tooltip: {
-        y: { formatter: (val) => formatPrice(val) }
+    const hasDonutData = computed(() => Object.values(categoryTotals.value).some(d => d > 0))
+
+    const donutChartOption = computed(() => {
+      const data = Object.entries(categoryTotals.value)
+        .filter(([_, val]) => val > 0)
+        .map(([name, value]) => ({ name, value }))
+
+      return {
+        color: CHART_PALETTE,
+        tooltip: getDonutTooltip('Rp'),
+        legend: {
+          bottom: 0,
+          left: 'center',
+          icon: 'circle',
+          itemWidth: 8,
+          itemHeight: 8,
+          textStyle: { color: '#64748b', fontSize: 11 }
+        },
+        series: [{
+          name: 'Porsi Kategori',
+          type: 'pie',
+          radius: ['45%', '72%'],
+          center: ['50%', '42%'],
+          avoidLabelOverlap: true,
+          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false },
+          emphasis: {
+            scale: true,
+            label: { show: true, fontSize: 12, fontWeight: 'bold', formatter: '{b}\n{d}%' }
+          },
+          data
+        }]
       }
-    }))
+    })
 
     // Weekly trend
-    const weeklyChartSeries = computed(() => {
+    const weeklyChartOption = computed(() => {
       const data = [];
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const dayOfWeek = today.getDay() || 7;
@@ -447,28 +469,46 @@ export default {
         }).reduce((s, e) => s + Number(e.amount), 0);
         data.push(val);
       }
-      return [{ name: 'Pengeluaran Mingguan', data }];
-    });
 
-    const weeklyChartOptions = {
-      chart: { toolbar: { show: false }, type: 'area', zoom: { enabled: false } },
-      colors: ['#4f46e5'],
-      stroke: { curve: 'smooth', width: 2 },
-      fill: {
-        type: 'gradient',
-        gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.02 }
-      },
-      xaxis: { categories: ['M-4', 'M-3', 'M-2', 'M-1', 'Minggu Ini'] },
-      yaxis: { labels: { formatter: (val) => new Intl.NumberFormat('id-ID', { notation: 'compact' }).format(val) } },
-      tooltip: { y: { formatter: (val) => 'Rp ' + new Intl.NumberFormat('id-ID').format(val) } },
-      dataLabels: {
-        enabled: true,
-        formatter: (val) => val > 0 ? new Intl.NumberFormat('id-ID').format(val) : ''
+      return {
+        color: ['#6366f1'],
+        tooltip: getModernTooltip((params) => {
+          const item = Array.isArray(params) ? params[0] : params
+          return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
+          <div style="color:#a5b4fc;font-weight:bold;">${formatIDR(item?.value || 0)}</div>`
+        }),
+        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: ['M-4', 'M-3', 'M-2', 'M-1', 'Minggu Ini'],
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: { color: '#64748b', fontSize: 10, formatter: (val) => formatCompactNumber(val) }
+        },
+        series: [{
+          name: 'Pengeluaran Mingguan',
+          type: 'line',
+          smooth: 0.35,
+          showSymbol: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: { width: 3, color: '#6366f1' },
+          itemStyle: { color: '#6366f1', borderColor: '#ffffff', borderWidth: 2 },
+          areaStyle: { color: createAreaGradient('#6366f1') },
+          data
+        }]
       }
-    };
+    })
+
+    const hasWeeklyData = computed(() => weeklyChartOption.value.series[0].data.some(d => d > 0))
 
     // Daily trend
-    const dailyChartSeries = computed(() => {
+    const dailyChartOption = computed(() => {
       const data = [];
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const dayOfWeek = today.getDay() || 7;
@@ -479,55 +519,90 @@ export default {
         const val = expenses.value.filter(e => e.date && e.date.startsWith(dateStr)).reduce((s, e) => s + Number(e.amount), 0);
         data.push(val);
       }
-      return [{ name: 'Pengeluaran', data }];
-    });
 
-    const dailyChartOptions = {
-      chart: { toolbar: { show: false }, type: 'bar', zoom: { enabled: false } },
-      colors: ['#0d9488'],
-      plotOptions: {
-        bar: { borderRadius: 6, columnWidth: '50%', dataLabels: { position: 'top' } }
-      },
-      dataLabels: {
-        enabled: true,
-        formatter: (val) => val > 0 ? new Intl.NumberFormat('id-ID').format(val) : '',
-        offsetY: -20,
-      },
-      xaxis: { categories: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'] },
-      yaxis: { labels: { formatter: (val) => new Intl.NumberFormat('id-ID').format(val) } },
-      tooltip: { y: { formatter: (val) => 'Rp ' + new Intl.NumberFormat('id-ID').format(val) } }
-    };
+      return {
+        color: ['#0d9488'],
+        tooltip: getModernTooltip((params) => {
+          const item = Array.isArray(params) ? params[0] : params
+          return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
+          <div style="color:#2dd4bf;font-weight:bold;">${formatIDR(item?.value || 0)}</div>`
+        }),
+        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: { color: '#64748b', fontSize: 10, formatter: (val) => formatCompactNumber(val) }
+        },
+        series: [{
+          name: 'Pengeluaran',
+          type: 'bar',
+          barMaxWidth: 18,
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: '#0d9488' },
+          data
+        }]
+      }
+    })
+
+    const hasDailyData = computed(() => dailyChartOption.value.series[0].data.some(d => d > 0))
 
     // Monthly trend
-    const monthlyChartSeries = computed(() => {
+    const monthlyChartOption = computed(() => {
       const data = [];
+      const categories = [];
       const now = new Date();
       for (let i = 5; i >= 0; i--) {
         const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        categories.push(m.toLocaleDateString('id-ID', { month: 'short' }));
         const val = expenses.value.filter(e => {
           const ed = new Date(e.date);
           return ed.getFullYear() === m.getFullYear() && ed.getMonth() === m.getMonth();
         }).reduce((s, e) => s + Number(e.amount), 0);
         data.push(val);
       }
-      return [{ name: 'Bulanan', data }];
-    });
 
-    const monthlyChartOptions = {
-      chart: { toolbar: { show: false }, type: 'area', zoom: { enabled: false } },
-      colors: ['#ea580c'],
-      xaxis: { categories: Array.from({length: 6}, (_, i) => {
-        const m = new Date();
-        m.setMonth(m.getMonth() - (5 - i));
-        return m.toLocaleDateString('id-ID', { month: 'short' });
-      }) },
-      yaxis: { labels: { formatter: (val) => new Intl.NumberFormat('id-ID').format(val) } },
-      tooltip: { y: { formatter: (val) => 'Rp ' + new Intl.NumberFormat('id-ID').format(val) } },
-      dataLabels: {
-        enabled: true,
-        formatter: (val) => val > 0 ? new Intl.NumberFormat('id-ID').format(val) : ''
+      return {
+        color: ['#ea580c'],
+        tooltip: getModernTooltip((params) => {
+          const item = Array.isArray(params) ? params[0] : params
+          return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
+          <div style="color:#fb923c;font-weight:bold;">${formatIDR(item?.value || 0)}</div>`
+        }),
+        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: categories,
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: { color: '#64748b', fontSize: 10, formatter: (val) => formatCompactNumber(val) }
+        },
+        series: [{
+          name: 'Bulanan',
+          type: 'line',
+          smooth: 0.35,
+          showSymbol: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: { width: 3, color: '#ea580c' },
+          itemStyle: { color: '#ea580c', borderColor: '#ffffff', borderWidth: 2 },
+          areaStyle: { color: createAreaGradient('#ea580c') },
+          data
+        }]
       }
-    };
+    })
+
+    const hasMonthlyData = computed(() => monthlyChartOption.value.series[0].data.some(d => d > 0))
 
     const getAccountName = (accountId) => {
       const acc = accounts.value.find(a => a.id === accountId)
@@ -541,11 +616,11 @@ export default {
     return {
       activeTab, expenses, onDelete, formatPrice, formatDate,
       addOutline, trashOutline, createOutline, pencilOutline, summary, createExpense,
-      weeklyChartSeries, weeklyChartOptions, budget, budgetProgress,
+      weeklyChartOption, hasWeeklyData, budget, budgetProgress,
       editingBudget, budgetDraft, startEditBudget, saveBudget, budgetCategoriesDraft,
-      donutSeries, donutOptions, accounts, getAccountName, filterSearch,
+      donutChartOption, hasDonutData, accounts, getAccountName, filterSearch,
       filterCategory, filterAccount, allCategories, filteredExpenses,
-      dailyChartSeries, dailyChartOptions, monthlyChartSeries, monthlyChartOptions,
+      dailyChartOption, hasDailyData, monthlyChartOption, hasMonthlyData,
       categoryPeriodMonths
     }
   }

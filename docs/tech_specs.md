@@ -4,7 +4,7 @@
 - **Frontend:** Vue 3 (Composition API)
 - **Native Bridge:** Capacitor
 - **UI:** CoreUI for Vue (Bootstrap 5)
-- **Charts:** Vue3-Apexcharts
+- **Charts:** Vue-ECharts (Apache ECharts)
 - **Persistence:** IndexedDB (via wrapper)
 - **Tooling:** Vite, npm
 

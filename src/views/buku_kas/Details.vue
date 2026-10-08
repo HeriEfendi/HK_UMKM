@@ -5,9 +5,8 @@ import { useRoute } from 'vue-router'
 import { db } from '@/db/schema'
 import { migrateProjectTransactions, getTransactionsByProject, calcProjectTotals } from '@/db/bukuKasMigration'
 import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle, IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonButtons, IonTitle, IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption, IonProgressBar, IonBadge, IonSpinner, IonList, IonListHeader, IonAlert, IonFooter, IonSegment, IonSegmentButton, IonBackButton } from '@ionic/vue';
-import AppToast from '@/components/AppToast.vue';
 import { addOutline, trashOutline, pencilOutline, closeOutline, cloudUploadOutline, cloudDownloadOutline, listOutline, checkmarkCircleOutline, searchOutline, arrowBackOutline } from 'ionicons/icons';
-const VueApexCharts = defineAsyncComponent(() => import("vue3-apexcharts"));
+import { CHART_PALETTE, formatIDR, formatCompactNumber, getModernTooltip, getDonutTooltip } from '@/utils/chartThemes'
 
 
 interface Transaction {
@@ -535,50 +534,6 @@ const availableCategories = computed(() => {
   return categories.EXPENSE
 })
 
-// Chart Options & Logic
-const donutOptions = computed(() => ({
-  chart: { 
-    type: 'donut',
-    height: 240,
-    width: '100%',
-    toolbar: { show: false },
-    zoom: { enabled: false },
-    selection: { enabled: false },
-  },
-  plotOptions: {
-    pie: {
-      expandOnClick: false,
-      donut: {
-        size: '75%',
-      }
-    }
-  },
-  colors: ['#059669', '#e11d48', '#3b82f6', '#8b5cf6', '#f59e0b', '#06b6d4', '#ec4899', '#6366f1', '#14b8a6', '#f97316'],
-  labels: Object.keys(categoryTotals.value),
-  stroke: {
-    lineCap: 'round',
-    width: 0
-  },
-  legend: { position: 'bottom', labels: { colors: '#64748b' } },
-  tooltip: {
-    enabled: true,
-    shared: true,
-    intersect: false,
-    y: {
-      formatter: (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val)
-    }
-  },
-  responsive: [{ breakpoint: 480, options: { chart: { width: '100%' }, legend: { position: 'bottom' } } }]
-}))
-
-const donutSeries = computed(() =>
-  Object.values(categoryTotals.value).map(v => (Number.isFinite(v) ? v : 0))
-)
-
-const chartDonutReady = computed(() =>
-  donutSeries.value.length > 0 && donutSeries.value.some(v => v > 0)
-)
-
 const categoryTotals = computed(() => {
   const totals: Record<string, number> = {}
   project.value?.transactions.filter(t => t.type === 'EXPENSE').forEach(t => {
@@ -586,6 +541,55 @@ const categoryTotals = computed(() => {
   })
   return totals
 })
+
+const donutChartOption = computed(() => {
+  const data = Object.entries(categoryTotals.value)
+    .filter(([_, val]) => val > 0)
+    .map(([name, value]) => ({ name, value }))
+
+  return {
+    color: CHART_PALETTE,
+    tooltip: getDonutTooltip('Rp'),
+    legend: {
+      bottom: 0,
+      left: 'center',
+      icon: 'circle',
+      itemWidth: 8,
+      itemHeight: 8,
+      textStyle: { color: '#64748b', fontSize: 11 }
+    },
+    series: [
+      {
+        name: 'Kategori Pengeluaran',
+        type: 'pie',
+        radius: ['45%', '72%'],
+        center: ['50%', '42%'],
+        avoidLabelOverlap: true,
+        itemStyle: {
+          borderRadius: 6,
+          borderColor: '#ffffff',
+          borderWidth: 2
+        },
+        label: { show: false },
+        emphasis: {
+          scale: true,
+          scaleSize: 6,
+          label: {
+            show: true,
+            fontSize: 12,
+            fontWeight: 'bold',
+            formatter: '{b}\n{d}%'
+          }
+        },
+        data
+      }
+    ]
+  }
+})
+
+const chartDonutReady = computed(() =>
+  Object.values(categoryTotals.value).some(v => v > 0)
+)
 
 const cashFlowData = computed(() => {
   if (!project.value) return { months: [], income: [], expense: [] }
@@ -622,57 +626,72 @@ const cashFlowData = computed(() => {
   }
 })
 
-const barOptions = computed(() => {
+const barChartOption = computed(() => {
   return {
-    chart: { 
-      type: 'bar',
-      height: 300,
-      width: '100%',
-      toolbar: { show: false } ,
-      sparkline: { enabled: false }
+    color: ['#10b981', '#ef4444'],
+    tooltip: getModernTooltip((params: any) => {
+      let res = `<div style="font-weight:600;margin-bottom:6px;">${params[0]?.name || ''}</div>`
+      params.forEach((item: any) => {
+        res += `<div style="display:flex;justify-content:space-between;gap:12px;margin-top:2px;">
+          <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${item.color};margin-right:6px;"></span>${item.seriesName}:</span>
+          <span style="font-weight:600;">${formatIDR(item.value)}</span>
+        </div>`
+      })
+      return res
+    }),
+    legend: {
+      bottom: 0,
+      left: 'center',
+      icon: 'circle',
+      itemWidth: 8,
+      itemHeight: 8,
+      textStyle: { color: '#64748b', fontSize: 11 }
     },
-    plotOptions: { bar: { borderRadius: 6, columnWidth: '50%', dataLabels: { position: 'top' } } },
-    dataLabels: {
-      enabled: false
+    grid: {
+      top: '12%',
+      left: '2%',
+      right: '2%',
+      bottom: '14%',
+      containLabel: true
     },
-    stroke: {
-      show: true,
-      width: 2,
-      colors: ['transparent']
+    xAxis: {
+      type: 'category',
+      data: cashFlowData.value.months,
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisTick: { show: false },
+      axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
     },
-    xaxis: { 
-      categories: cashFlowData.value.months,
-      labels: { style: { colors: '#64748b', fontWeight: 600 } }
-    },
-    yaxis: {
-      labels: {
-        style: { colors: '#64748b' },
-        formatter: (val: number) => new Intl.NumberFormat('id-ID').format(val)
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+      axisLabel: {
+        color: '#64748b',
+        fontSize: 10,
+        formatter: (val: number) => formatCompactNumber(val)
       }
     },
-    colors: ['#059669', '#e11d48'],
-    tooltip: {
-      enabled: true,
-      shared: true,
-      intersect: false,
-      y: {
-        formatter: (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val)
+    series: [
+      {
+        name: 'Uang Masuk',
+        type: 'bar',
+        barMaxWidth: 16,
+        itemStyle: {
+          borderRadius: [4, 4, 0, 0]
+        },
+        data: cashFlowData.value.income.map(v => (Number.isFinite(v) ? v : 0))
+      },
+      {
+        name: 'Uang Keluar',
+        type: 'bar',
+        barMaxWidth: 16,
+        itemStyle: {
+          borderRadius: [4, 4, 0, 0]
+        },
+        data: cashFlowData.value.expense.map(v => (Number.isFinite(v) ? v : 0))
       }
-    },
-    grid: { borderColor: '#e2e8f0', strokeDashArray: 4 }
+    ]
   }
 })
-
-const barSeries = computed(() => [
-  {
-    name: 'Uang Masuk',
-    data: cashFlowData.value.income.map(v => (Number.isFinite(v) ? v : 0))
-  },
-  {
-    name: 'Uang Keluar',
-    data: cashFlowData.value.expense.map(v => (Number.isFinite(v) ? v : 0))
-  }
-])
 
 const chartBarReady = computed(() =>
   cashFlowData.value.months.length > 0
@@ -823,11 +842,11 @@ onUnmounted(() => clearInterval(interval))
               <ion-col size="12" size-sm="6" size-lg="6" v-if="chartBarReady">
                 <ion-card class="mobile-card m-0 h-100">
                   <ion-card-content class="container-padded">
-                    <h6 class="fw-bold text-dark mb-3">Arus Kas Bulanan</h6>
-                    <VueApexCharts
-                      :key="'bar-' + chartKey"
-                      type="bar" height="240"
-                      :options="barOptions" :series="barSeries"
+                    <h6 class="fw-bold text-dark mb-2">Arus Kas Bulanan</h6>
+                    <v-chart
+                      :option="barChartOption"
+                      autoresize
+                      style="height: 240px; width: 100%;"
                     />
                   </ion-card-content>
                 </ion-card>
@@ -836,11 +855,11 @@ onUnmounted(() => clearInterval(interval))
               <ion-col size="12" size-sm="6" size-lg="6" v-if="chartDonutReady">
                 <ion-card class="mobile-card m-0 h-100">
                   <ion-card-content class="container-padded">
-                    <h6 class="fw-bold text-dark mb-3">Pengeluaran per Kategori</h6>
-                    <VueApexCharts
-                      :key="'donut-' + chartKey"
-                      type="donut" height="240"
-                      :options="donutOptions" :series="donutSeries"
+                    <h6 class="fw-bold text-dark mb-2">Pengeluaran per Kategori</h6>
+                    <v-chart
+                      :option="donutChartOption"
+                      autoresize
+                      style="height: 240px; width: 100%;"
                     />
                   </ion-card-content>
                 </ion-card>

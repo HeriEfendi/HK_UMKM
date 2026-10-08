@@ -85,7 +85,7 @@ Semua data operasional tersimpan **secara lokal (Offline-First)** di sisi klien:
 | **UI Components** | [Ionic Vue 8](https://ionicframework.com/docs/vue/overview) & [CoreUI Vue](https://coreui.io/vue/) |
 | **Styling & Icons** | Vanilla CSS + [Bootstrap 5](https://getbootstrap.com/) utilities + Ionicons + FontAwesome |
 | **Database** | [Dexie.js v4](https://dexie.org/) & `idb` (IndexedDB Wrapper) |
-| **Data Visualization** | [ApexCharts](https://apexcharts.com/) via `vue3-apexcharts` |
+| **Data Visualization** | [Apache ECharts](https://echarts.apache.org/) via `vue-echarts` |
 | **Import & Export** | [SheetJS (XLSX)](https://sheetjs.com/) |
 | **State Management & Router** | Vuex 4 & Vue Router 4 / `@ionic/vue-router` |
 

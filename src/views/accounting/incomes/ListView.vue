@@ -67,8 +67,8 @@
             <ion-col size="12" size-sm="6" size-lg="4">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <h6 class="fw-bold text-dark mb-3">Grafik Mingguan</h6>
-                  <VueApexCharts v-if="weeklyChartSeries[0].data.some(d => d > 0)" :key="'weekly-' + incomes.length" type="area" height="240" :options="weeklyChartOptions" :series="weeklyChartSeries" />
+                  <h6 class="fw-bold text-dark mb-2">Grafik Mingguan</h6>
+                  <v-chart v-if="hasWeeklyData" :option="weeklyChartOption" autoresize style="height: 240px; width: 100%;" />
                   <div v-else class="text-center py-4 text-muted">Belum ada data mingguan.</div>
                 </ion-card-content>
               </ion-card>
@@ -76,8 +76,8 @@
             <ion-col size="12" size-sm="6" size-lg="4">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <h6 class="fw-bold text-dark mb-3">Grafik Bulanan</h6>
-                  <VueApexCharts v-if="monthlyChartSeries[0].data.some(d => d > 0)" :key="'monthly-' + incomes.length" type="area" height="240" :options="monthlyChartOptions" :series="monthlyChartSeries" />
+                  <h6 class="fw-bold text-dark mb-2">Grafik Bulanan</h6>
+                  <v-chart v-if="hasMonthlyData" :option="monthlyChartOption" autoresize style="height: 240px; width: 100%;" />
                   <div v-else class="text-center py-4 text-muted">Belum ada data bulanan.</div>
                 </ion-card-content>
               </ion-card>
@@ -85,8 +85,8 @@
             <ion-col size="12" size-sm="6" size-lg="4">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <h6 class="fw-bold text-dark mb-3">Porsi Pendapatan per Kategori</h6>
-                  <VueApexCharts v-if="donutSeries.length > 0 && donutSeries.some(d => d > 0)" :key="'donut-' + JSON.stringify(categoryTotals)" type="donut" height="240" :options="donutOptions" :series="donutSeries" />
+                  <h6 class="fw-bold text-dark mb-2">Porsi Pendapatan per Kategori</h6>
+                  <v-chart v-if="hasDonutData" :option="donutChartOption" autoresize style="height: 240px; width: 100%;" />
                   <div v-else class="text-center py-5 text-muted">Belum ada pendapatan di bulan ini.</div>
                 </ion-card-content>
               </ion-card>
@@ -265,12 +265,11 @@ import { onIonViewWillEnter, IonPage, IonContent, IonHeader, IonToolbar, IonTitl
 import { addOutline, trashOutline, createOutline } from 'ionicons/icons';
 import { incomesRepo, salesRepo, expensesRepo } from '../../../db/repositories'
 import IncomeModal from './IncomeModal.vue'
-
-const VueApexCharts = defineAsyncComponent(() => import("vue3-apexcharts"));
+import { CHART_PALETTE, formatIDR, formatCompactNumber, getModernTooltip, getDonutTooltip, createAreaGradient } from '../../../utils/chartThemes'
 
 export default {
   name: 'AccountingIncomesListView',
-  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IncomeModal, VueApexCharts },
+  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IncomeModal },
   setup() {
     const activeTab = ref('dashboard')
     const incomes = ref([])
@@ -381,7 +380,7 @@ export default {
     };
 
     // Weekly trend
-    const weeklyChartSeries = computed(() => {
+    const weeklyChartOption = computed(() => {
       const data = [];
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const dayOfWeek = today.getDay() || 7;
@@ -397,52 +396,95 @@ export default {
         }).reduce((s, e) => s + Number(e.amount), 0);
         data.push(val);
       }
-      return [{ name: 'Pendapatan Mingguan', data }];
-    });
 
-    const weeklyChartOptions = {
-      chart: { toolbar: { show: false }, type: 'area', zoom: { enabled: false } },
-      colors: ['#4f46e5'],
-      stroke: { curve: 'smooth', width: 2 },
-      fill: {
-        type: 'gradient',
-        gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.02 }
-      },
-      xaxis: { categories: ['M-4', 'M-3', 'M-2', 'M-1', 'Minggu Ini'] },
-      yaxis: { labels: { formatter: (val) => new Intl.NumberFormat('id-ID', { notation: 'compact' }).format(val) } },
-      tooltip: { y: { formatter: (val) => 'Rp ' + new Intl.NumberFormat('id-ID').format(val) } },
-      dataLabels: {
-        enabled: true,
-        formatter: (val) => val > 0 ? new Intl.NumberFormat('id-ID').format(val) : ''
+      return {
+        color: ['#10b981'],
+        tooltip: getModernTooltip((params) => {
+          const item = Array.isArray(params) ? params[0] : params
+          return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
+          <div style="color:#34d399;font-weight:bold;">${formatIDR(item?.value || 0)}</div>`
+        }),
+        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: ['M-4', 'M-3', 'M-2', 'M-1', 'Minggu Ini'],
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: { color: '#64748b', fontSize: 10, formatter: (val) => formatCompactNumber(val) }
+        },
+        series: [{
+          name: 'Pendapatan Mingguan',
+          type: 'line',
+          smooth: 0.35,
+          showSymbol: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: { width: 3, color: '#10b981' },
+          itemStyle: { color: '#10b981', borderColor: '#ffffff', borderWidth: 2 },
+          areaStyle: { color: createAreaGradient('#10b981') },
+          data
+        }]
       }
-    };
+    })
 
-    const monthlyChartSeries = computed(() => {
+    const hasWeeklyData = computed(() => weeklyChartOption.value.series[0].data.some(d => d > 0))
+
+    // Monthly trend
+    const monthlyChartOption = computed(() => {
       const data = [];
+      const categories = [];
       const now = new Date();
       for (let i = 5; i >= 0; i--) {
         const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        categories.push(m.toLocaleDateString('id-ID', { month: 'short' }));
         const val = incomes.value.filter(e => {
           const ed = new Date(e.date);
           return ed.getFullYear() === m.getFullYear() && ed.getMonth() === m.getMonth();
         }).reduce((s, e) => s + Number(e.amount), 0);
         data.push(val);
       }
-      return [{ name: 'Bulanan', data }];
-    });
 
-    const monthlyChartOptions = {
-      chart: { toolbar: { show: false }, type: 'area', zoom: { enabled: false } },
-      colors: ['#ea580c'],
-      xaxis: { categories: Array.from({length: 6}, (_, i) => {
-        const m = new Date();
-        m.setMonth(m.getMonth() - (5 - i));
-        return m.toLocaleDateString('id-ID', { month: 'short' });
-      }) },
-      yaxis: { labels: { formatter: (val) => new Intl.NumberFormat('id-ID').format(val) } },
-      tooltip: { y: { formatter: (val) => 'Rp ' + new Intl.NumberFormat('id-ID').format(val) } },
-      dataLabels: { enabled: true, formatter: (val) => val > 0 ? new Intl.NumberFormat('id-ID').format(val) : '' }
-    };
+      return {
+        color: ['#3b82f6'],
+        tooltip: getModernTooltip((params) => {
+          const item = Array.isArray(params) ? params[0] : params
+          return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
+          <div style="color:#60a5fa;font-weight:bold;">${formatIDR(item?.value || 0)}</div>`
+        }),
+        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: categories,
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: { color: '#64748b', fontSize: 10, formatter: (val) => formatCompactNumber(val) }
+        },
+        series: [{
+          name: 'Bulanan',
+          type: 'line',
+          smooth: 0.35,
+          showSymbol: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: { width: 3, color: '#3b82f6' },
+          itemStyle: { color: '#3b82f6', borderColor: '#ffffff', borderWidth: 2 },
+          areaStyle: { color: createAreaGradient('#3b82f6') },
+          data
+        }]
+      }
+    })
+
+    const hasMonthlyData = computed(() => monthlyChartOption.value.series[0].data.some(d => d > 0))
 
     // Donut Chart
     const categoryTotals = computed(() => {
@@ -457,15 +499,40 @@ export default {
       return totals
     })
 
-    const donutSeries = computed(() => Object.values(categoryTotals.value).map(v => Number.isFinite(v) ? Number(v) : 0))
-    const donutOptions = computed(() => ({
-      chart: { type: 'donut', toolbar: { show: false } },
-      labels: Object.keys(categoryTotals.value),
-      colors: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6'],
-      legend: { position: 'bottom' },
-      stroke: { width: 0 },
-      tooltip: { y: { formatter: (val) => formatPrice(val) } }
-    }))
+    const hasDonutData = computed(() => Object.values(categoryTotals.value).some(d => d > 0))
+
+    const donutChartOption = computed(() => {
+      const data = Object.entries(categoryTotals.value)
+        .filter(([_, val]) => val > 0)
+        .map(([name, value]) => ({ name, value }))
+
+      return {
+        color: CHART_PALETTE,
+        tooltip: getDonutTooltip('Rp'),
+        legend: {
+          bottom: 0,
+          left: 'center',
+          icon: 'circle',
+          itemWidth: 8,
+          itemHeight: 8,
+          textStyle: { color: '#64748b', fontSize: 11 }
+        },
+        series: [{
+          name: 'Porsi Pendapatan',
+          type: 'pie',
+          radius: ['45%', '72%'],
+          center: ['50%', '42%'],
+          avoidLabelOverlap: true,
+          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false },
+          emphasis: {
+            scale: true,
+            label: { show: true, fontSize: 12, fontWeight: 'bold', formatter: '{b}\n{d}%' }
+          },
+          data
+        }]
+      }
+    })
 
     // Profit & Loss calculation
     const plData = computed(() => {
@@ -537,9 +604,8 @@ export default {
       activeTab, incomes, sales, expenses, onDelete, formatPrice, formatDate,
       addOutline, trashOutline, createOutline, summary, openModal, isModalOpen,
       selectedIncomeId, fetchAll, filterSearch, filterCategory, allCategories,
-      filteredIncomes, dailyChartSeries, dailyChartOptions, monthlyChartSeries,
-      monthlyChartOptions, donutSeries, donutOptions, weeklyChartSeries,
-      weeklyChartOptions, plPeriod, plData
+      filteredIncomes, monthlyChartOption, hasMonthlyData, donutChartOption,
+      hasDonutData, weeklyChartOption, hasWeeklyData, plPeriod, plData
     }
   }
 }

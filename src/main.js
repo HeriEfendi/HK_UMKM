@@ -11,6 +11,7 @@ import router from './router'
 import store from './store'
 import { seedDatabase } from './db/schema'
 import NumberInput from './components/NumberInput.vue'
+import { VChart } from './plugins/echarts'
 
 
 
@@ -41,6 +42,8 @@ async function initializeApp() {
   app.use(store);
   app.use(router);
   app.component('NumberInput', NumberInput);
+  app.component('v-chart', VChart);
+  app.component('VChart', VChart);
 
   const vm = app.mount('#app');
   // expose app for header toggle interop

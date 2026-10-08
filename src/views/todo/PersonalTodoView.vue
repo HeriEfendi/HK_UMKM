@@ -83,8 +83,8 @@
                   <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="fw-bold text-dark mb-0">Pembagian Status</h6>
                   </div>
-                  <div v-if="tasks.length > 0 && statusChartSeries.some(v => v > 0)">
-                    <VueApexCharts type="donut" height="240" :options="statusChartOptions" :series="statusChartSeries" />
+                  <div v-if="hasStatusData">
+                    <v-chart :option="statusDonutOption" autoresize style="height: 240px; width: 100%;" />
                   </div>
                   <div v-else class="text-center py-4 text-muted">Belum ada data task.</div>
                 </ion-card-content>
@@ -94,11 +94,11 @@
             <ion-col size="12" size-lg="6">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="fw-bold text-dark mb-0">Prioritas Task</h6>
                   </div>
-                  <div v-if="tasks.length > 0 && priorityChartSeries[0].data.some(v => v > 0)">
-                    <VueApexCharts type="bar" height="240" :options="priorityChartOptions" :series="priorityChartSeries" />
+                  <div v-if="hasPriorityData">
+                    <v-chart :option="priorityChartOption" autoresize style="height: 240px; width: 100%;" />
                   </div>
                   <div v-else class="text-center py-4 text-muted">Belum ada data prioritas.</div>
                 </ion-card-content>
@@ -317,8 +317,7 @@ import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import * as XLSX from 'xlsx';
-
-const VueApexCharts = defineAsyncComponent(() => import('vue3-apexcharts'))
+import { getModernTooltip, getDonutTooltip } from '@/utils/chartThemes';
 
 const tasks = ref<any[]>([])
 const dialogVisible = ref(false)
@@ -354,17 +353,9 @@ const loadTasks = async () => {
   const allTasks = await TodoRepository.getAll()
   tasks.value = allTasks.filter(t => t.type === 'PERSONAL')
   updateMetrics()
-  updateCharts()
-  nextTick(() => {
-    setTimeout(() => {
-      window.dispatchEvent(new Event('resize'))
-    }, 100)
-  })
 }
 
 const metrics = ref({ total: 0, inProgress: 0, done: 0, dueToday: 0 })
-const statusChartSeries = ref([0, 0, 0])
-const priorityChartSeries = ref([{ name: 'Prioritas', data: [0, 0, 0, 0] }])
 
 const getLocalDateString = (d = new Date()) => {
   const y = d.getFullYear()
@@ -383,16 +374,86 @@ const updateMetrics = () => {
   }
 }
 
-const updateCharts = () => {
-  const statusCount = { 'TO DO': 0, 'IN PROGRESS': 0, DONE: 0 }
-  const priorityCount = { Highest: 0, High: 0, Medium: 0, Low: 0 }
+const hasStatusData = computed(() => tasks.value.length > 0)
+
+const statusDonutOption = computed(() => {
+  const statusCount: Record<string, number> = { 'TO DO': 0, 'IN PROGRESS': 0, DONE: 0 }
   tasks.value.forEach(task => {
     statusCount[task.status] = (statusCount[task.status] || 0) + 1
+  })
+
+  const data = [
+    { name: 'TO DO', value: statusCount['TO DO'] },
+    { name: 'IN PROGRESS', value: statusCount['IN PROGRESS'] },
+    { name: 'DONE', value: statusCount.DONE }
+  ].filter(item => item.value > 0)
+
+  return {
+    color: ['#3b82f6', '#f59e0b', '#10b981'],
+    tooltip: getDonutTooltip('Task'),
+    legend: {
+      bottom: 0,
+      left: 'center',
+      icon: 'circle',
+      itemWidth: 8,
+      itemHeight: 8,
+      textStyle: { color: '#64748b', fontSize: 11 }
+    },
+    series: [{
+      name: 'Pembagian Status',
+      type: 'pie',
+      radius: ['45%', '72%'],
+      center: ['50%', '42%'],
+      avoidLabelOverlap: true,
+      itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+      label: { show: false },
+      emphasis: {
+        scale: true,
+        label: { show: true, fontSize: 12, fontWeight: 'bold', formatter: '{b}\n{c} ({d}%)' }
+      },
+      data
+    }]
+  }
+})
+
+const hasPriorityData = computed(() => tasks.value.length > 0)
+
+const priorityChartOption = computed(() => {
+  const priorityCount: Record<string, number> = { Highest: 0, High: 0, Medium: 0, Low: 0 }
+  tasks.value.forEach(task => {
     priorityCount[task.priority || 'Medium'] = (priorityCount[task.priority || 'Medium'] || 0) + 1
   })
-  statusChartSeries.value = [statusCount['TO DO'], statusCount['IN PROGRESS'], statusCount.DONE]
-  priorityChartSeries.value = [{ name: 'Prioritas', data: [priorityCount.Highest, priorityCount.High, priorityCount.Medium, priorityCount.Low] }]
-}
+
+  return {
+    color: ['#6366f1'],
+    tooltip: getModernTooltip((params: any) => {
+      const item = Array.isArray(params) ? params[0] : params
+      return `<div style="font-weight:600;margin-bottom:4px;">Prioritas: ${item?.name || ''}</div>
+      <div style="color:#a5b4fc;font-weight:bold;">${item?.value || 0} Task</div>`
+    }),
+    grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: ['Highest', 'High', 'Medium', 'Low'],
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisTick: { show: false },
+      axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+      axisLabel: { color: '#64748b', fontSize: 10 }
+    },
+    series: [{
+      name: 'Prioritas',
+      type: 'bar',
+      barMaxWidth: 24,
+      itemStyle: { borderRadius: [4, 4, 0, 0], color: '#6366f1' },
+      data: [priorityCount.Highest, priorityCount.High, priorityCount.Medium, priorityCount.Low]
+    }]
+  }
+})
 
 const filteredTasks = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
@@ -429,23 +490,6 @@ const filterCount = (status: string) => {
   if (status === 'ALL') return tasks.value.length
   if (status === 'OVERDUE') return tasks.value.filter(t => t.due_date && t.status !== 'DONE' && t.due_date < today).length
   return tasks.value.filter(t => t.status === status).length
-}
-
-const statusChartOptions = {
-  chart: { type: 'donut', toolbar: { show: false } },
-  labels: ['TO DO', 'IN PROGRESS', 'DONE'],
-  legend: { position: 'bottom', horizontalAlign: 'center' },
-  colors: ['#3b82f6', '#f59e0b', '#10b981'],
-  dataLabels: { enabled: true, formatter: (val: any) => `${Math.round(val)}%` }
-}
-
-const priorityChartOptions = {
-  chart: { type: 'bar', toolbar: { show: false } },
-  plotOptions: { bar: { borderRadius: 8 } },
-  xaxis: { categories: ['Highest', 'High', 'Medium', 'Low'] },
-  colors: ['#6366f1'],
-  dataLabels: { enabled: false },
-  yaxis: { labels: { formatter: (val: any) => `${val}` } }
 }
 
 const openDialog = () => {

@@ -27,7 +27,7 @@ A web and native-ready financial project management application built with Vue 3
 - Status-based task tracking with card-based UI.
 
 ### 3.4. Analytics & Reporting
-- Visual dashboards using `vue3-apexcharts`:
+- Visual dashboards using `vue-echarts` (Apache ECharts):
   - Donut chart: Expense distribution.
   - Bar chart: Monthly cash flow.
 
@@ -38,7 +38,7 @@ A web and native-ready financial project management application built with Vue 3
 - **Frontend:** Vue 3 (Composition API).
 - **Native Bridge:** Capacitor.
 - **UI:** CoreUI for Vue (Bootstrap 5 based).
-- **Charts:** Vue3-Apexcharts.
+- **Charts:** Vue-ECharts (Apache ECharts).
 - **Persistence:** IndexedDB (migrated from LocalStorage for reliability).
 - **Tooling:** Vite, npm.
 

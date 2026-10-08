@@ -295,9 +295,9 @@
             <ion-col size="12" size-lg="6">
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
-                  <h6 class="fw-bold text-dark mb-3">Grafik Penjualan 7 Hari Terakhir</h6>
-                  <div v-if="chartSeries[0].data.some(v => v > 0)">
-                    <VueApexCharts :key="'sales-chart-' + salesHistory.length" type="area" height="260" :options="chartOptions" :series="chartSeries" />
+                  <h6 class="fw-bold text-dark mb-2">Grafik Penjualan 7 Hari Terakhir</h6>
+                  <div v-if="hasSalesData">
+                    <v-chart :option="salesChartOption" autoresize style="height: 250px; width: 100%;" />
                   </div>
                   <div v-else class="text-center py-4 text-muted">
                     Belum ada data penjualan 7 hari terakhir.
@@ -714,14 +714,13 @@ import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIco
 import { addOutline, removeOutline, trashOutline, cartOutline, basketOutline, printOutline, downloadOutline, calendarOutline, documentTextOutline, logoWhatsapp, searchOutline as searchIcon } from 'ionicons/icons';
 import { readProductImage } from '../../composables/useProductImage';
 import * as XLSX from 'xlsx';
-
-const VueApexCharts = defineAsyncComponent(() => import("vue3-apexcharts"));
+import { getModernTooltip, formatCompactNumber, createAreaGradient } from '../../utils/chartThemes';
 
 export default {
   name: 'CashierView',
   components: { 
     IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, 
-    IonSegment, IonSegmentButton, IonLabel, IonButtons, IonBackButton, IonModal, IonAlert, VueApexCharts,
+    IonSegment, IonSegmentButton, IonLabel, IonButtons, IonBackButton, IonModal, IonAlert,
     IonGrid, IonRow, IonCol, IonCard, IonCardContent
   },
   setup() {
@@ -1154,74 +1153,81 @@ export default {
     })
 
     // Trend Chart Options and Data
-    const chartSeries = computed(() => {
-      // Daily revenue for last 7 days
-      const seriesData = []
+    const hasSalesData = computed(() => {
       const today = new Date()
-      
       for (let i = 6; i >= 0; i--) {
         const d = new Date()
         d.setDate(today.getDate() - i)
         const dateStr = d.toISOString().split('T')[0]
-        
         const daySales = salesHistory.value.filter(s => s.createdAt && s.createdAt.startsWith(dateStr))
         const dayTotal = daySales.reduce((sum, s) => sum + (s.totalAmount || 0), 0)
-        
-        seriesData.push(Number.isFinite(dayTotal) ? dayTotal : 0)
+        if (dayTotal > 0) return true
       }
-
-      return [{
-        name: 'Omset Penjualan',
-        data: seriesData
-      }]
+      return false
     })
 
-    const chartOptions = computed(() => {
+    const salesChartOption = computed(() => {
       const categoriesData = []
+      const seriesData = []
       const today = new Date()
 
       for (let i = 6; i >= 0; i--) {
         const d = new Date()
         d.setDate(today.getDate() - i)
+        const dateStr = d.toISOString().split('T')[0]
         categoriesData.push(d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric' }))
+
+        const daySales = salesHistory.value.filter(s => s.createdAt && s.createdAt.startsWith(dateStr))
+        const dayTotal = daySales.reduce((sum, s) => sum + (s.totalAmount || 0), 0)
+        seriesData.push(Number.isFinite(dayTotal) ? dayTotal : 0)
       }
 
       return {
-        chart: {
-          id: 'sales-trend',
-          type: 'area',
-          toolbar: { show: false },
-          sparkline: { enabled: false },
-          zoom: { enabled: false }
+        color: ['#6366f1'],
+        tooltip: getModernTooltip((params) => {
+          const item = Array.isArray(params) ? params[0] : params
+          return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
+          <div style="color:#a5b4fc;font-weight:bold;">${formatPrice(item?.value || 0)}</div>`
+        }),
+        grid: {
+          top: '12%',
+          left: '2%',
+          right: '4%',
+          bottom: '8%',
+          containLabel: true
         },
-        dataLabels: { enabled: false },
-        stroke: { curve: 'smooth', width: 3 },
-        fill: {
-          type: 'gradient',
-          colors: ['#6366f1'],
-          gradient: {
-            shadeIntensity: 1,
-            opacityFrom: 0.45,
-            opacityTo: 0.05,
-            stops: [0, 90, 100]
+        xAxis: {
+          type: 'category',
+          data: categoriesData,
+          axisLine: { lineStyle: { color: '#e2e8f0' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#64748b', fontSize: 11, fontWeight: 500 }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
+          axisLabel: {
+            color: '#64748b',
+            fontSize: 10,
+            formatter: (val) => formatCompactNumber(val)
           }
         },
-        xaxis: {
-          categories: categoriesData,
-          labels: { style: { colors: '#64748b', fontWeight: 600 } }
-        },
-        yaxis: {
-          labels: {
-            formatter: (val) => new Intl.NumberFormat('id-ID', { notation: 'compact', compactDisplay: 'short' }).format(val),
-            style: { colors: '#64748b', fontWeight: 600 }
+        series: [
+          {
+            name: 'Omset Penjualan',
+            type: 'line',
+            smooth: 0.35,
+            showSymbol: true,
+            symbol: 'circle',
+            symbolSize: 6,
+            lineStyle: { width: 3, color: '#6366f1' },
+            itemStyle: { color: '#6366f1', borderColor: '#ffffff', borderWidth: 2 },
+            areaStyle: {
+              color: createAreaGradient('#6366f1')
+            },
+            data: seriesData
           }
-        },
-        tooltip: {
-          y: {
-            formatter: (val) => formatPrice(val)
-          }
-        },
-        colors: ['#6366f1']
+        ]
       }
     })
 
@@ -1322,8 +1328,8 @@ export default {
       formatDateTime,
       kpiMetrics,
       topProducts,
-      chartSeries,
-      chartOptions,
+      hasSalesData,
+      salesChartOption,
       exportExcel,
       addOutline,
       removeOutline,

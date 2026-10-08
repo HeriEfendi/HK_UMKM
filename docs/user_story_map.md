@@ -9,7 +9,7 @@
 ## Phase 2: Refinement
 - [x] Migration to IndexedDB
 - [x] Modal for Add/Edit
-- [x] Apexcharts Visualization
+- [x] ECharts Visualization
 
 ## Phase 3: Productivity
 - [ ] Daily Task Board (Card View)

@@ -12,7 +12,7 @@
 
 - [x] Project Setup.
 - [x] IndexedDB Migration.
-- [x] Basic Financial Reporting (Apexcharts).
+- [x] Basic Financial Reporting (ECharts).
 - [x] Refactor Personal Todo UI & Features:
   - [x] Convert status filter to `<ion-segment>`.
   - [x] Place Modal Form action buttons in `<ion-footer>`.
