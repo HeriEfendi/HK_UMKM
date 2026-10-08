@@ -1,0 +1,1 @@
+import{d as a}from"./index-CeudvBKu.js";import"./vendor-D3M2bMQ-.js";import"./echarts-9uPDsLOj.js";const l=async()=>(a.isOpen()||await a.open(),{async get(t,e){return await a.table(t).get(e)},async getAll(t){return await a.table(t).toArray()},async put(t,e){return await a.table(t).put(e)},async delete(t,e){return await a.table(t).delete(e)}});export{l as initDB};
