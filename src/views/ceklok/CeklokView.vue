@@ -1385,7 +1385,7 @@ export default {
           return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
           <div style="color:#a5b4fc;font-weight:bold;">${formatHours(item?.value || 0)}</div>`;
         }),
-        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        grid: { top: '15%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
         xAxis: {
           type: 'category',
           data: weeklyChartSeries.value.labels,
@@ -1395,6 +1395,7 @@ export default {
         },
         yAxis: {
           type: 'value',
+          boundaryGap: [0, '15%'],
           splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
           axisLabel: { color: '#64748b', fontSize: 10 }
         },
@@ -1403,6 +1404,18 @@ export default {
           type: 'bar',
           barMaxWidth: 18,
           itemStyle: { borderRadius: [4, 4, 0, 0], color: '#6366f1' },
+          label: {
+            show: true,
+            position: 'top',
+            fontSize: 10,
+            fontWeight: 600,
+            color: '#000000',
+            formatter: (params) => {
+              const val = params?.value;
+              if (!val || val <= 0) return '';
+              return formatHours(val);
+            }
+          },
           data: weeklyChartSeries.value.series[0].data
         }]
       };
@@ -1451,7 +1464,7 @@ export default {
           return `<div style="font-weight:600;margin-bottom:4px;">${item?.name || ''}</div>
           <div style="color:#2dd4bf;font-weight:bold;">${formatHours(item?.value || 0)}</div>`;
         }),
-        grid: { top: '12%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
+        grid: { top: '15%', left: '2%', right: '4%', bottom: '8%', containLabel: true },
         xAxis: {
           type: 'category',
           data: categories,
@@ -1461,6 +1474,7 @@ export default {
         },
         yAxis: {
           type: 'value',
+          boundaryGap: [0, '15%'],
           splitLine: { lineStyle: { type: 'dashed', color: '#f1f5f9' } },
           axisLabel: { color: '#64748b', fontSize: 10 }
         },
@@ -1474,6 +1488,18 @@ export default {
           lineStyle: { width: 3, color: '#0d9488' },
           itemStyle: { color: '#0d9488', borderColor: '#ffffff', borderWidth: 2 },
           areaStyle: { color: createAreaGradient('#0d9488') },
+          label: {
+            show: true,
+            position: 'top',
+            fontSize: 10,
+            fontWeight: 600,
+            color: '#0f766e',
+            formatter: (params) => {
+              const val = params?.value;
+              if (!val || val <= 0) return '';
+              return formatHours(val);
+            }
+          },
           data: data.map(v => Number.isFinite(v) ? Number(v.toFixed(2)) : 0)
         }]
       };
