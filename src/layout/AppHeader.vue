@@ -36,7 +36,11 @@ export default {
     const router = useRouter();
     const isDashboard = computed(() => route ? route.path === '/dashboard' : false)
     const goBack = () => {
-      router.back();
+      if (window.history.length > 1 && window.history.state?.back) {
+        router.back();
+      } else {
+        router.push('/dashboard');
+      }
     }
 
     const toggleSidebar = async () => {

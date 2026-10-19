@@ -320,10 +320,11 @@ export default {
     const submitPayment = async () => {
       if (!form.amount || form.amount <= 0 || !props.debt) return
 
+      const payAmount = Math.min(Number(form.amount), remainingAmount.value)
       const rawDebt = JSON.parse(JSON.stringify(props.debt))
       const newInstallment = {
         id: Date.now(),
-        amount: Number(form.amount),
+        amount: payAmount,
         date: form.date || new Date().toISOString().slice(0, 10),
         notes: form.notes || 'Pembayaran Cicilan'
       }

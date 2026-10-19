@@ -112,18 +112,22 @@ export function getNextOccurrence(r: ReminderItem): string | null {
     }
 
     case 'monthly': {
-      const parts = r.date.split('-')
+      const parts = (r.date || '').split('-')
       const dayOfMonth = r.recurringDayOfMonth ?? parseInt(parts[2] || '1', 10)
       const now = new Date()
-      let candidate = new Date(now.getFullYear(), now.getMonth(), dayOfMonth)
+      const maxDaysThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+      let candidate = new Date(now.getFullYear(), now.getMonth(), Math.min(dayOfMonth, maxDaysThisMonth))
       if (formatLocalDate(candidate) < today) {
-        candidate = new Date(now.getFullYear(), now.getMonth() + 1, dayOfMonth)
+        const maxDaysNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0).getDate()
+        candidate = new Date(now.getFullYear(), now.getMonth() + 1, Math.min(dayOfMonth, maxDaysNextMonth))
       }
       return formatLocalDate(candidate)
     }
 
     case 'yearly': {
-      const [, mm, dd] = r.date.split('-')
+      const parts = (r.date || '').split('-')
+      const mm = parts[1] || '01'
+      const dd = parts[2] || '01'
       const thisYear = new Date().getFullYear()
       let candidate = `${thisYear}-${mm}-${dd}`
       if (candidate < today) candidate = `${thisYear + 1}-${mm}-${dd}`
@@ -135,10 +139,12 @@ export function getNextOccurrence(r: ReminderItem): string | null {
   }
 }
 
-export function daysUntil(dateStr: string): number {
+export function daysUntil(dateStr?: string | null): number {
+  if (!dateStr) return 0
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const parts = dateStr.split('-').map(Number)
+  const parts = String(dateStr).split('-').map(Number)
+  if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) return 0
   const target = new Date(parts[0], parts[1] - 1, parts[2])
   target.setHours(0, 0, 0, 0)
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))

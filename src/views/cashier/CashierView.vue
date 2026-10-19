@@ -958,7 +958,7 @@ export default {
       // Deduct stock and log mutation
       for (const item of cart.value) {
         const prod = await ProductRepository.getById(item.id)
-        const newStock = prod.stock - item.quantity
+        const newStock = Math.max(0, (prod.stock || 0) - item.quantity)
         await ProductRepository.update(item.id, { ...prod, stock: newStock })
 
         await stockMutationsRepo.add({
