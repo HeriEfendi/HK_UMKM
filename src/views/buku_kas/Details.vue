@@ -117,7 +117,7 @@ const filteredTransactions = computed(() => {
   })
 })
 
-const netProfit = computed(() => (project.value as any).panen_total - project.value.total_expenses)
+const netProfit = computed(() => (((project.value as any)?.panen_total || 0) - (project.value?.total_expenses || 0)))
 const roi = computed(() => {
   const modal = (project.value as any)?.modal_total || 0
   if (modal <= 0) return 0
@@ -125,7 +125,7 @@ const roi = computed(() => {
 })
 
 const profitPercent = computed(() => {
-  const sales = (project.value as any).panen_total || 0
+  const sales = (project.value as any)?.panen_total || 0
   if (sales <= 0) return 0
   return Math.floor((netProfit.value / sales) * 100) || 0
 })

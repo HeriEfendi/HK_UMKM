@@ -116,7 +116,7 @@
           <div v-for="income in filteredIncomes" :key="income.id" class="col-12 col-sm-6 col-lg-4 g-2 m-0 mb-1 px-2">
             <div class="mobile-card-sm h-100 d-flex align-items-center justify-content-between p-2">
               <div class="d-flex flex-column" style="flex: 1; min-width: 0;">
-                <h6 class="fw-bold text-dark mb-0 text-truncate medium w-100">{{ income.description }}</h6>
+                <h6 class="fw-bold text-dark mb-0 text-truncate medium w-100">{{ income.description || income.name || '-' }}</h6>
               </div>
               <div class="d-flex flex-column align-items-end text-end me-2" style="flex: 2; min-width: 0;">
                 <small class="text-muted medium">{{ formatDate(income.date) }}</small>

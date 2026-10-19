@@ -1011,6 +1011,10 @@ export default {
         const fontSize = is58 ? '10px' : '12px'
         
         const popupWin = window.open('', '_blank', 'width=380,height=600')
+        if (!popupWin) {
+          window.print()
+          return
+        }
         popupWin.document.open()
         popupWin.document.write(`
           <html>

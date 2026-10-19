@@ -87,7 +87,7 @@ export default {
     })
 
     const saveUser = async () => {
-      if (!user.value.name || !user.value.email) return
+      if (!user.value.name?.trim()) return
       saving.value = true
       try {
         if (isEdit.value) {

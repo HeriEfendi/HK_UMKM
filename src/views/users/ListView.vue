@@ -260,7 +260,8 @@ export default {
     }
 
     const openWhatsApp = (phone) => {
-      let clean = phone.replace(/\D/g, '')
+      if (!phone) return
+      let clean = String(phone).replace(/\D/g, '')
       if (clean.startsWith('0')) clean = '62' + clean.slice(1)
       window.open(`https://wa.me/${clean}`, '_blank')
     }

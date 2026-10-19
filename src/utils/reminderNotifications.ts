@@ -146,7 +146,6 @@ export async function scheduleReminderNotifications(reminders: ReminderItem[]) {
             body,
             schedule: { at: atDate },
             channelId: 'reminders',
-            smallIcon: 'ic_stat_icon_config_sample',
             iconColor: offset === 0 ? '#6366f1' : '#f59e0b',
           })
         }

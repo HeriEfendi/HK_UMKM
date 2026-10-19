@@ -1174,7 +1174,7 @@ export default {
           const d = new Date(log.clockIn);
           return d >= finalStart && d <= finalEnd;
         })
-        .reduce((sum, log) => sum + log.totalWorkHours, 0);
+        .reduce((sum, log) => sum + (log.totalWorkHours || 0), 0);
     });
 
     const totalMonthHours = computed(() => {
@@ -1185,7 +1185,7 @@ export default {
           const d = new Date(log.clockIn);
           return d >= start && d < end;
         })
-        .reduce((sum, log) => sum + log.totalWorkHours, 0);
+        .reduce((sum, log) => sum + (log.totalWorkHours || 0), 0);
     });
 
     const daysWorkedThisMonth = computed(() => {

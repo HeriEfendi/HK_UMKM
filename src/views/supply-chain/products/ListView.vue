@@ -354,6 +354,10 @@ export default {
       const printContent = document.getElementById('label-print-area')
       if (printContent) {
         const popupWin = window.open('', '_blank', 'width=350,height=350')
+        if (!popupWin) {
+          window.print()
+          return
+        }
         popupWin.document.open()
         popupWin.document.write(`
           <html>
