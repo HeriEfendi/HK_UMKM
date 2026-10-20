@@ -9,6 +9,7 @@ import {
   DatasetComponent,
   GraphicComponent
 } from 'echarts/components'
+import { LegacyGridContainLabel } from 'echarts/features'
 import VChart from 'vue-echarts'
 
 use([
@@ -17,6 +18,7 @@ use([
   BarChart,
   LineChart,
   GridComponent,
+  LegacyGridContainLabel,
   TooltipComponent,
   LegendComponent,
   TitleComponent,

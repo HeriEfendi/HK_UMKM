@@ -296,7 +296,7 @@
               <ion-card class="mobile-card m-0 h-100">
                 <ion-card-content class="container-padded">
                   <h6 class="fw-bold text-dark mb-2">Grafik Penjualan 7 Hari Terakhir</h6>
-                  <div v-if="hasSalesData">
+                  <div v-if="activeTab === 'dashboard' && hasSalesData">
                     <v-chart :option="salesChartOption" autoresize style="height: 250px; width: 100%;" />
                   </div>
                   <div v-else class="text-center py-4 text-muted">

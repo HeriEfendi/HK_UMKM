@@ -186,7 +186,7 @@
                       <span class="badge bg-light text-muted border text-xs">Pemberi Utang</span>
                     </div>
                     <v-chart 
-                      v-if="hasTopDebtsData"
+                      v-if="activeTab === 'dashboard' && hasTopDebtsData"
                       :option="topDebtsChartOption" 
                       autoresize
                       style="height: 240px; width: 100%;"
@@ -205,7 +205,7 @@
                       <span class="badge bg-light text-muted border text-xs">Proporsi</span>
                     </div>
                     <v-chart 
-                      v-if="hasStatusDonutData"
+                      v-if="activeTab === 'dashboard' && hasStatusDonutData"
                       :option="statusDonutOption" 
                       autoresize
                       style="height: 240px; width: 100%;"
@@ -433,7 +433,7 @@
                       </div>
                     </div>
                     <v-chart 
-                      v-if="hasDueTrendData"
+                      v-if="activeTab === 'analisa' && hasDueTrendData"
                       :option="dueTrendChartOption" 
                       autoresize
                       style="height: 260px; width: 100%;"

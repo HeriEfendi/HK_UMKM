@@ -166,7 +166,7 @@
                     <h6 class="fw-bold text-dark mb-0">Grafik Harian Minggu Ini</h6>
                     <span class="badge bg-light text-muted border small">{{ weeklyPeriodRange }}</span>
                   </div>
-                  <v-chart v-if="hasWeeklyData" :option="weeklyChartOption" autoresize style="height: 240px; width: 100%;" />
+                  <v-chart v-if="activeTab === 'dashboard' && hasWeeklyData" :option="weeklyChartOption" autoresize style="height: 240px; width: 100%;" />
                   <div v-else class="text-center py-4 text-muted">Belum ada data untuk minggu ini.</div>
                 </ion-card-content>
               </ion-card>
@@ -179,7 +179,7 @@
                     <h6 class="fw-bold text-dark mb-0">Grafik Mingguan Bulan Ini</h6>
                     <span class="badge bg-light text-muted border small">{{ monthlyPeriodRange }}</span>
                   </div>
-                  <v-chart v-if="hasMonthlyData" :option="monthlyChartOption" autoresize style="height: 240px; width: 100%;" />
+                  <v-chart v-if="activeTab === 'dashboard' && hasMonthlyData" :option="monthlyChartOption" autoresize style="height: 240px; width: 100%;" />
                   <div v-else class="text-center py-4 text-muted">Belum ada data untuk bulan ini.</div>
                 </ion-card-content>
               </ion-card>

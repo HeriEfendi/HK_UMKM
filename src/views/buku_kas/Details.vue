@@ -7,6 +7,7 @@ import { migrateProjectTransactions, getTransactionsByProject, calcProjectTotals
 import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle, IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonButtons, IonTitle, IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption, IonProgressBar, IonBadge, IonSpinner, IonList, IonListHeader, IonAlert, IonFooter, IonSegment, IonSegmentButton, IonBackButton } from '@ionic/vue';
 import { addOutline, trashOutline, pencilOutline, closeOutline, cloudUploadOutline, cloudDownloadOutline, listOutline, checkmarkCircleOutline, searchOutline, arrowBackOutline } from 'ionicons/icons';
 import { CHART_PALETTE, formatIDR, formatCompactNumber, getModernTooltip, getDonutTooltip } from '@/utils/chartThemes'
+import AppToast from '@/components/AppToast.vue'
 
 
 interface Transaction {
@@ -38,6 +39,7 @@ const project = ref<Project | null>(null)
 const loading = ref(false)
 const activeTab = ref('dashboard')
 const chartKey = ref(0)
+const isChartMounted = ref(false)
 
 watch(activeTab, (newTab) => {
   if (newTab === 'dashboard') {
@@ -173,8 +175,9 @@ async function fetchProject(silent = false) {
     chartKey.value++
     nextTick(() => {
       setTimeout(() => {
+        isChartMounted.value = true
         window.dispatchEvent(new Event('resize'))
-      }, 100)
+      }, 150)
     })
   } catch(e) {
     console.error("Failed to fetch project:", e);
@@ -841,9 +844,11 @@ onUnmounted(() => clearInterval(interval))
             <ion-row>
               <ion-col size="12" size-sm="6" size-lg="6" v-if="chartBarReady">
                 <ion-card class="mobile-card m-0 h-100">
-                  <ion-card-content class="container-padded">
+                  <ion-card-content class="container-padded" style="min-height: 280px;">
                     <h6 class="fw-bold text-dark mb-2">Arus Kas Bulanan</h6>
                     <v-chart
+                      v-if="isChartMounted"
+                      :key="`bar-${chartKey}`"
                       :option="barChartOption"
                       autoresize
                       style="height: 240px; width: 100%;"
@@ -854,9 +859,11 @@ onUnmounted(() => clearInterval(interval))
 
               <ion-col size="12" size-sm="6" size-lg="6" v-if="chartDonutReady">
                 <ion-card class="mobile-card m-0 h-100">
-                  <ion-card-content class="container-padded">
+                  <ion-card-content class="container-padded" style="min-height: 280px;">
                     <h6 class="fw-bold text-dark mb-2">Pengeluaran per Kategori</h6>
                     <v-chart
+                      v-if="isChartMounted"
+                      :key="`donut-${chartKey}`"
                       :option="donutChartOption"
                       autoresize
                       style="height: 240px; width: 100%;"

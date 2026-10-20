@@ -179,14 +179,14 @@
           <!-- Trend Area Chart -->
           <div class="mobile-card container-padded mb-3">
             <h6 class="fw-bold text-dark mb-2">Grafik Perkembangan Aset (6 Bulan Terakhir)</h6>
-            <v-chart v-if="hasTrendData" :option="trendChartOption" autoresize style="height: 240px; width: 100%;" />
+            <v-chart v-if="activeTab === 'analisa' && hasTrendData" :option="trendChartOption" autoresize style="height: 240px; width: 100%;" />
             <div v-else class="text-center py-5 text-muted">Belum ada mutasi dana untuk menampilkan grafik perkembangan.</div>
           </div>
 
           <!-- Distribution Donut Chart -->
           <div class="mobile-card container-padded mb-3">
             <h6 class="fw-bold text-dark mb-2">Distribusi Aset Tabungan</h6>
-            <v-chart v-if="hasDistributionData" :option="distributionChartOption" autoresize style="height: 240px; width: 100%;" />
+            <v-chart v-if="activeTab === 'analisa' && hasDistributionData" :option="distributionChartOption" autoresize style="height: 240px; width: 100%;" />
             <div v-else class="text-center py-5 text-muted">Tambahkan saldo di akun Anda untuk melihat distribusi aset.</div>
           </div>
         </div>
