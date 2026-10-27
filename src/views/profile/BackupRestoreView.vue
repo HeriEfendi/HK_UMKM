@@ -207,6 +207,7 @@ import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import AppToast from '@/components/AppToast.vue';
+import { prepareRecordsForExcel, restoreRecordsFromExcel } from '@/utils/attachmentHelper';
 
 const fileInput = ref(null);
 const loading = ref(false);
@@ -329,9 +330,10 @@ async function handleBackup() {
       loadingMessage.value = `Mengekspor tabel ${i + 1}/${tables.length}: ${table.name}…`;
       try {
         const data = await table.toArray();
+        const preparedData = await prepareRecordsForExcel(data);
 
         // Sanitize every cell – no value may exceed EXCEL_CELL_LIMIT chars
-        const cleanedData = data.map((row) => {
+        const cleanedData = preparedData.map((row) => {
           const cleaned = { ...row };
           for (const key of Object.keys(cleaned)) {
             cleaned[key] = sanitizeCellValue(cleaned[key]);
@@ -435,39 +437,7 @@ async function handleFileChange(e) {
 
           // 2. Parse and insert new rows if any
           if (rows.length > 0) {
-            const cleanedRows = rows.map((row) => {
-              const cleaned = { ...row };
-              delete cleaned.__rowNum__;
-
-              for (const key of Object.keys(cleaned)) {
-                const val = cleaned[key];
-                if (typeof val === 'string') {
-                  if (
-                    (val.startsWith('[') && val.endsWith(']')) ||
-                    (val.startsWith('{') && val.endsWith('}'))
-                  ) {
-                    try {
-                      cleaned[key] = JSON.parse(val);
-                      continue;
-                    } catch {
-                      // ignore
-                    }
-                  }
-
-                  const isIdField = key === 'id' || key.endsWith('Id') || key.endsWith('_id');
-                  const isNumericField = /price|stock|amount|qty|quantity|discount|balance|total|sum|count|hours|minutes|rate/i.test(key);
-
-                  if (isIdField || isNumericField) {
-                    const num = Number(val);
-                    if (!isNaN(num) && val.trim() !== '') {
-                      cleaned[key] = num;
-                    }
-                  }
-                }
-              }
-              return cleaned;
-            });
-
+            const cleanedRows = restoreRecordsFromExcel(rows);
             await table.bulkAdd(cleanedRows);
           }
 
