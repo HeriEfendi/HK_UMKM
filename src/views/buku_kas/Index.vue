@@ -7,6 +7,7 @@ import { migrateProjectTransactions, calcProjectTotals } from '@/db/bukuKasMigra
 import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle, IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonButtons, IonTitle, IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption, IonProgressBar, IonBadge, IonSpinner, IonAlert, IonFooter, IonSegment, IonSegmentButton } from '@ionic/vue';
 import AppToast from '@/components/AppToast.vue';
 import { addOutline, trashOutline, pencilOutline, arrowForwardOutline, closeOutline, trendingUpOutline, trendingDownOutline, pieChartOutline, searchOutline } from 'ionicons/icons';
+import { transactionAttachmentsRepo } from '@/db/repositories';
 
 interface Project {
   id: number
@@ -156,9 +157,12 @@ async function deleteProject(id: number) {
     if (!db.isOpen()) await db.open()
     projects.value = projects.value.filter(p => p.id !== id)
     await db.table('projects').delete(id)
-    // Hapus juga semua transaksi terkait project ini
+    // Hapus juga semua transaksi dan lampirannya terkait project ini
     const txIds = await db.table('transactions').where('project_id').equals(id).primaryKeys()
     await db.table('transactions').bulkDelete(txIds)
+    for (const txId of txIds) {
+      await transactionAttachmentsRepo.deleteByTransactionId(Number(txId))
+    }
     dialogDeleteId.value = null
     showSnackbar('Buku kas berhasil dihapus', 'success')
   } catch (e) {

@@ -5,10 +5,11 @@ import { useRoute } from 'vue-router'
 import { db } from '@/db/schema'
 import { migrateProjectTransactions, getTransactionsByProject, calcProjectTotals } from '@/db/bukuKasMigration'
 import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle, IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonButtons, IonTitle, IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption, IonProgressBar, IonBadge, IonSpinner, IonList, IonListHeader, IonAlert, IonFooter, IonSegment, IonSegmentButton, IonBackButton } from '@ionic/vue';
-import { addOutline, trashOutline, pencilOutline, closeOutline, cloudUploadOutline, cloudDownloadOutline, listOutline, checkmarkCircleOutline, searchOutline, arrowBackOutline } from 'ionicons/icons';
+import { addOutline, trashOutline, pencilOutline, closeOutline, cloudUploadOutline, cloudDownloadOutline, listOutline, checkmarkCircleOutline, searchOutline, arrowBackOutline, cameraOutline, imageOutline, eyeOutline, documentAttachOutline } from 'ionicons/icons';
 import { CHART_PALETTE, formatIDR, formatCompactNumber, getModernTooltip, getDonutTooltip } from '@/utils/chartThemes'
 import AppToast from '@/components/AppToast.vue'
-
+import { compressReceiptImage, capturePhotoFromCamera, pickPhotoFromGallery } from '@/utils/attachmentHelper'
+import { transactionAttachmentsRepo } from '@/db/repositories'
 
 interface Transaction {
   id: number
@@ -18,6 +19,7 @@ interface Transaction {
   amount: number
   date: string
   description: string | null
+  hasAttachment?: boolean
 }
 
 interface Project {
@@ -151,6 +153,146 @@ function getStatusColor(status: string) {
   return 'secondary'
 }
 
+// Attachment state for form dialog
+const attachmentFileInputRef = ref<HTMLInputElement | null>(null)
+const attachmentBlob = ref<Blob | null>(null)
+const attachmentMime = ref('image/webp')
+const attachmentFileName = ref('')
+const attachmentSize = ref(0)
+const attachmentDimensions = ref('')
+const attachmentFormat = ref('WEBP')
+const attachmentPreviewUrl = ref<string | null>(null)
+const attachmentChanged = ref(false)
+const compressing = ref(false)
+const showZoomModal = ref(false)
+
+// Quick receipt preview from transaction list
+const selectedReceipt = ref<any>(null)
+const showReceiptModal = ref(false)
+
+function clearAttachmentPreview() {
+  if (attachmentPreviewUrl.value) {
+    URL.revokeObjectURL(attachmentPreviewUrl.value)
+    attachmentPreviewUrl.value = null
+  }
+}
+
+function setAttachmentData(compressedResult: any, fileName = '') {
+  clearAttachmentPreview()
+  attachmentBlob.value = compressedResult.blob
+  attachmentMime.value = compressedResult.mimeType
+  attachmentSize.value = compressedResult.size
+  attachmentDimensions.value = `${compressedResult.width}×${compressedResult.height}px`
+  attachmentFormat.value = (compressedResult.mimeType.split('/')[1] || 'webp').toUpperCase()
+  attachmentFileName.value = fileName || `nota_${Date.now()}.${compressedResult.mimeType === 'image/jpeg' ? 'jpg' : 'webp'}`
+  attachmentPreviewUrl.value = URL.createObjectURL(compressedResult.blob)
+  attachmentChanged.value = true
+}
+
+async function handleCameraCapture() {
+  try {
+    compressing.value = true
+    const result = await capturePhotoFromCamera()
+    if (result) {
+      setAttachmentData(result, `nota_kamera_${Date.now()}.webp`)
+    }
+  } catch (err: any) {
+    console.warn('Camera capture error, fallback to file input:', err)
+    attachmentFileInputRef.value?.click()
+  } finally {
+    compressing.value = false
+  }
+}
+
+async function handleGalleryPick() {
+  try {
+    compressing.value = true
+    const result = await pickPhotoFromGallery()
+    if (result) {
+      setAttachmentData(result, `nota_galeri_${Date.now()}.webp`)
+    }
+  } catch (err: any) {
+    console.warn('Gallery pick error, fallback to file input:', err)
+    attachmentFileInputRef.value?.click()
+  } finally {
+    compressing.value = false
+  }
+}
+
+async function onFileInputChange(event: any) {
+  const file = event.target?.files?.[0]
+  if (!file) return
+
+  try {
+    compressing.value = true
+    const result = await compressReceiptImage(file, 1200, 0.75)
+    const ext = result.mimeType === 'image/jpeg' ? 'jpg' : 'webp'
+    const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || 'nota'
+    setAttachmentData(result, `${baseName}.${ext}`)
+  } catch (err: any) {
+    console.error('File compression error:', err)
+    alert('Gagal mengompres gambar: ' + (err?.message || 'Error'))
+  } finally {
+    compressing.value = false
+    event.target.value = ''
+  }
+}
+
+function removeAttachment() {
+  clearAttachmentPreview()
+  attachmentBlob.value = null
+  attachmentSize.value = 0
+  attachmentDimensions.value = ''
+  attachmentFileName.value = ''
+  attachmentChanged.value = true
+}
+
+function formatFileSize(bytes: number) {
+  if (!bytes || bytes <= 0) return '0 B'
+  if (bytes < 1024) return bytes + ' B'
+  const kb = bytes / 1024
+  if (kb < 1024) return kb.toFixed(1) + ' KB'
+  return (kb / 1024).toFixed(2) + ' MB'
+}
+
+async function viewReceipt(tx: Transaction) {
+  try {
+    const att = await transactionAttachmentsRepo.getByTransactionId(tx.id)
+    if (att && att.blob instanceof Blob) {
+      if (selectedReceipt.value?.url) {
+        URL.revokeObjectURL(selectedReceipt.value.url)
+      }
+      selectedReceipt.value = {
+        url: URL.createObjectURL(att.blob),
+        fileName: att.fileName || 'Nota.webp',
+        size: att.blob.size,
+        txCategory: tx.category,
+        txAmount: tx.amount,
+        txType: tx.type,
+        txDescription: tx.description
+      }
+      showReceiptModal.value = true
+    } else {
+      showSnackbar('Lampiran nota tidak ditemukan', 'warning')
+    }
+  } catch (err) {
+    console.error('Failed to load transaction receipt:', err)
+  }
+}
+
+function closeReceiptModal() {
+  if (selectedReceipt.value?.url) {
+    URL.revokeObjectURL(selectedReceipt.value.url)
+  }
+  selectedReceipt.value = null
+  showReceiptModal.value = false
+}
+
+onUnmounted(() => {
+  clearAttachmentPreview()
+  closeReceiptModal()
+})
+
 async function fetchProject(silent = false) {
   if (!silent) loading.value = true
   try {
@@ -160,8 +302,15 @@ async function fetchProject(silent = false) {
     
     if (found) {
       // Baca transaksi dari tabel terpisah
-      const txs = await getTransactionsByProject(projectId)
-      found.transactions = txs
+      const [txs, allAtts] = await Promise.all([
+        getTransactionsByProject(projectId),
+        transactionAttachmentsRepo.getAll()
+      ])
+      const attTxIds = new Set(allAtts.map((a: any) => a.transactionId))
+      found.transactions = txs.map((t: any) => ({
+        ...t,
+        hasAttachment: Boolean(t.hasAttachment || attTxIds.has(t.id))
+      }))
 
       // Hitung totals dari tabel transactions terpisah
       const totals = await calcProjectTotals(projectId)
@@ -201,21 +350,52 @@ async function saveTransaction() {
   try {
     if (!db.isOpen()) await db.open()
     const projectId = project.value!.id
+    let txId = editingTxId.value
 
-    if (editingTxId.value) {
+    if (txId) {
       // Update transaksi yang sudah ada
-      const existing = await db.table('transactions').get(editingTxId.value)
+      const existing = await db.table('transactions').get(txId)
       if (existing) {
-        await db.table('transactions').put({ ...existing, ...formTx.value, project_id: projectId })
+        await db.table('transactions').put({
+          ...existing,
+          ...formTx.value,
+          project_id: projectId,
+          hasAttachment: Boolean(attachmentBlob.value)
+        })
+      }
+
+      if (attachmentChanged.value) {
+        await transactionAttachmentsRepo.deleteByTransactionId(txId)
+        if (attachmentBlob.value) {
+          await transactionAttachmentsRepo.add({
+            transactionId: txId,
+            blob: attachmentBlob.value,
+            mimeType: attachmentMime.value || 'image/webp',
+            fileName: attachmentFileName.value || `nota_tx_${txId}.webp`,
+            createdAt: new Date().toISOString()
+          })
+        }
       }
     } else {
       // Tambah transaksi baru
+      txId = Date.now()
       const newTx: Transaction = {
-        id: Date.now(),
+        id: txId,
         project_id: projectId,
-        ...formTx.value
+        ...formTx.value,
+        hasAttachment: Boolean(attachmentBlob.value)
       }
       await db.table('transactions').put(newTx)
+
+      if (attachmentBlob.value) {
+        await transactionAttachmentsRepo.add({
+          transactionId: txId,
+          blob: attachmentBlob.value,
+          mimeType: attachmentMime.value || 'image/webp',
+          fileName: attachmentFileName.value || `nota_tx_${txId}.webp`,
+          createdAt: new Date().toISOString()
+        })
+      }
     }
 
     // Hitung ulang totals dan update di project
@@ -245,6 +425,7 @@ async function deleteTransaction(id: number) {
         const projectId = project.value!.id
 
         await db.table('transactions').delete(id)
+        await transactionAttachmentsRepo.deleteByTransactionId(id)
 
         // Hitung ulang totals dan update di project
         const totals = await calcProjectTotals(projectId)
@@ -264,9 +445,15 @@ async function deleteTransaction(id: number) {
     }
 }
 
-
 function openCreateDialog() {
   editingTxId.value = null
+  clearAttachmentPreview()
+  attachmentBlob.value = null
+  attachmentSize.value = 0
+  attachmentDimensions.value = ''
+  attachmentFileName.value = ''
+  attachmentChanged.value = false
+
   formTx.value = {
     type: 'EXPENSE',
     category: '',
@@ -277,8 +464,15 @@ function openCreateDialog() {
   dialogTransaction.value = true
 }
 
-function openEditDialog(tx: Transaction) {
+async function openEditDialog(tx: Transaction) {
   editingTxId.value = tx.id
+  clearAttachmentPreview()
+  attachmentBlob.value = null
+  attachmentSize.value = 0
+  attachmentDimensions.value = ''
+  attachmentFileName.value = ''
+  attachmentChanged.value = false
+
   formTx.value = {
     type: tx.type,
     category: tx.category,
@@ -286,10 +480,26 @@ function openEditDialog(tx: Transaction) {
     date: tx.date.substring(0, 10),
     description: tx.description || '',
   }
+
+  try {
+    const existingAtt = await transactionAttachmentsRepo.getByTransactionId(tx.id)
+    if (existingAtt && existingAtt.blob instanceof Blob) {
+      attachmentBlob.value = existingAtt.blob
+      attachmentMime.value = existingAtt.mimeType || existingAtt.blob.type || 'image/webp'
+      attachmentFileName.value = existingAtt.fileName || 'nota.webp'
+      attachmentSize.value = existingAtt.blob.size
+      attachmentFormat.value = (attachmentMime.value.split('/')[1] || 'webp').toUpperCase()
+      attachmentPreviewUrl.value = URL.createObjectURL(existingAtt.blob)
+    }
+  } catch (err) {
+    console.error('Failed to load transaction attachment:', err)
+  }
+
   dialogTransaction.value = true
 }
 
 function closeDialog() {
+  clearAttachmentPreview()
   dialogTransaction.value = false
   editingTxId.value = null
 }
@@ -932,7 +1142,19 @@ onUnmounted(() => clearInterval(interval))
                     <small class="text-muted d-block">{{ formatDate(tx.date) }}</small>
                   </div>
                   <div class="transaction-main text-truncate px-1">
-                    <div class="fw-bold text-truncate">{{ tx.category }}</div>
+                    <div class="d-flex align-items-center gap-1 text-truncate">
+                      <span class="fw-bold text-truncate">{{ tx.category }}</span>
+                      <button
+                        v-if="tx.hasAttachment"
+                        type="button"
+                        class="badge bg-success border-0 text-white d-inline-flex align-items-center gap-1 cursor-pointer py-1 px-2 flex-shrink-0"
+                        style="font-size: 9px; cursor: pointer;"
+                        @click.stop="viewReceipt(tx)"
+                        title="Lihat Foto Nota"
+                      >
+                        <ion-icon :icon="documentAttachOutline" /> Nota
+                      </button>
+                    </div>
                     <div class="text-muted text-truncate">{{ tx.description || '-' }}</div>
                   </div>
                   <div class="transaction-amount text-end fw-bold me-2" :class="{ 'text-success': tx.type === 'DEPOSIT', 'text-danger': tx.type === 'EXPENSE' }">
@@ -1039,6 +1261,98 @@ onUnmounted(() => clearInterval(interval))
                     <label class="form-label">Deskripsi</label>
                     <input type="text" v-model="formTx.description" class="form-control app-control form-control-textarea" />
                 </div>
+
+                <!-- LAMPIRAN NOTA / BUKTI BAYAR -->
+                <div class="form-section mt-2">
+                  <label class="form-label d-flex justify-content-between align-items-center mb-1">
+                    <span>Lampiran Nota / Bukti (Opsional)</span>
+                    <span v-if="attachmentBlob" class="badge bg-success text-white" style="font-size: 11px;">
+                      {{ attachmentFormat }} • {{ formatFileSize(attachmentSize) }}
+                    </span>
+                  </label>
+
+                  <!-- Upload buttons if no attachment -->
+                  <div v-if="!attachmentPreviewUrl && !compressing" class="attachment-actions-box">
+                    <div class="d-flex gap-2">
+                      <button
+                        type="button"
+                        class="btn btn-outline-primary flex-fill d-flex align-items-center justify-content-center gap-2 py-2"
+                        @click="handleCameraCapture"
+                      >
+                        <ion-icon :icon="cameraOutline" style="font-size: 1.2rem;" />
+                        <span class="fw-semibold" style="font-size: 13px;">Kamera</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        class="btn btn-outline-secondary flex-fill d-flex align-items-center justify-content-center gap-2 py-2"
+                        @click="handleGalleryPick"
+                      >
+                        <ion-icon :icon="imageOutline" style="font-size: 1.2rem;" />
+                        <span class="fw-semibold" style="font-size: 13px;">Galeri</span>
+                      </button>
+                    </div>
+
+                    <!-- Hidden file input for web/desktop fallback -->
+                    <input
+                      type="file"
+                      ref="attachmentFileInputRef"
+                      accept="image/*"
+                      class="d-none"
+                      @change="onFileInputChange"
+                    />
+
+                    <small class="text-muted d-block mt-2" style="font-size: 11px;">
+                      ⚡ Otomatis di-resize &amp; kompres ke format <strong>WebP</strong> (ringan di DB dan tetap jernih).
+                    </small>
+                  </div>
+
+                  <!-- Compressing Loading State -->
+                  <div v-else-if="compressing" class="text-center p-3 border rounded bg-light">
+                    <ion-spinner name="crescent" color="primary" />
+                    <p class="text-xs text-muted mb-0 mt-2">Mengompres &amp; mengoptimalkan nota ke WebP...</p>
+                  </div>
+
+                  <!-- Preview Card if attachment exists -->
+                  <div v-else class="attachment-preview-card border rounded p-2 bg-light">
+                    <div class="d-flex align-items-center gap-3">
+                      <img
+                        :src="attachmentPreviewUrl"
+                        alt="Preview Nota"
+                        class="rounded border shadow-sm cursor-pointer"
+                        style="width: 64px; height: 64px; object-fit: cover; background: #fff;"
+                        @click="showZoomModal = true"
+                      />
+                      <div class="flex-grow-1" style="min-width: 0;">
+                        <div class="fw-bold text-dark text-truncate" style="font-size: 12px;">
+                          {{ attachmentFileName || 'Nota_Transaksi.webp' }}
+                        </div>
+                        <div class="text-muted" style="font-size: 11px;">
+                          Ukuran: <strong class="text-success">{{ formatFileSize(attachmentSize) }}</strong>
+                          <span v-if="attachmentDimensions"> • {{ attachmentDimensions }}</span>
+                        </div>
+                        <div class="mt-1 d-flex gap-2">
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 py-0 px-2"
+                            style="font-size: 11px;"
+                            @click="showZoomModal = true"
+                          >
+                            <ion-icon :icon="eyeOutline" /> Lihat
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 py-0 px-2"
+                            style="font-size: 11px;"
+                            @click="removeAttachment"
+                          >
+                            <ion-icon :icon="trashOutline" /> Hapus
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
             </div>
         </ion-content>
         <ion-footer>
@@ -1047,6 +1361,69 @@ onUnmounted(() => clearInterval(interval))
             <button type="button" class="btn btn-action primary w-100 mt-2" @click="saveTransaction">Save Changes</button>
           </div>
         </ion-footer>
+    </ion-modal>
+
+    <!-- Quick Receipt Preview Modal for transactions list -->
+    <ion-modal :is-open="showReceiptModal" @didDismiss="closeReceiptModal">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Lampiran Nota Transaksi</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="closeReceiptModal">
+              <ion-icon :icon="closeOutline" />
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding text-center">
+        <div v-if="selectedReceipt" class="d-flex flex-column align-items-center justify-content-center h-100">
+          <div class="mb-3 text-start w-100 p-2 bg-light rounded border">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="fw-bold text-dark fs-6">{{ selectedReceipt.txCategory }}</span>
+              <span :class="selectedReceipt.txType === 'DEPOSIT' ? 'text-success fw-bold' : 'text-danger fw-bold'">
+                {{ selectedReceipt.txType === 'DEPOSIT' ? '+' : '-' }}{{ formatCurrency(selectedReceipt.txAmount) }}
+              </span>
+            </div>
+            <div v-if="selectedReceipt.txDescription" class="text-muted text-xs mt-1">
+              {{ selectedReceipt.txDescription }}
+            </div>
+          </div>
+          <img
+            :src="selectedReceipt.url"
+            alt="Foto Nota"
+            style="max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+          />
+          <div class="mt-2 text-muted" style="font-size: 11px;">
+            {{ selectedReceipt.fileName || 'Nota' }} • {{ formatFileSize(selectedReceipt.size) }}
+          </div>
+        </div>
+      </ion-content>
+    </ion-modal>
+
+    <!-- Zoom Modal for Form Dialog -->
+    <ion-modal :is-open="showZoomModal" @didDismiss="showZoomModal = false">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Lampiran Nota</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="showZoomModal = false">
+              <ion-icon :icon="closeOutline" />
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding text-center">
+        <div class="d-flex flex-column align-items-center justify-content-center h-100">
+          <img
+            :src="attachmentPreviewUrl || ''"
+            alt="Nota Lengkap"
+            style="max-width: 100%; max-height: 75vh; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+          />
+          <div class="mt-3 text-muted text-xs">
+            {{ attachmentFileName }} • {{ attachmentFormat }} • {{ formatFileSize(attachmentSize) }}
+          </div>
+        </div>
+      </ion-content>
     </ion-modal>
 
     <AppToast 
