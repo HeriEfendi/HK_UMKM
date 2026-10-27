@@ -201,7 +201,19 @@
           <div v-for="expense in filteredExpenses" :key="expense.id" class="col-12 col-sm-6 col-lg-4 g-2 m-0 mb-1 px-2">
             <div class="mobile-card-sm h-100 d-flex align-items-center justify-content-between p-2">
               <div class="d-flex flex-column" style="flex: 1; min-width: 0;">
-                <span class="badge bg-primary mb-1 small align-self-start">{{ expense.category || 'Umum' }}</span>
+                <div class="d-flex align-items-center gap-1 mb-1 flex-wrap">
+                  <span class="badge bg-primary small align-self-start">{{ expense.category || 'Umum' }}</span>
+                  <button
+                    v-if="expense.hasAttachment"
+                    type="button"
+                    class="badge bg-success border-0 text-white d-inline-flex align-items-center gap-1 cursor-pointer py-1 px-2"
+                    style="font-size: 10px; cursor: pointer;"
+                    @click.stop="viewReceipt(expense)"
+                    title="Lihat Foto Nota"
+                  >
+                    <ion-icon :icon="documentAttachOutline" /> Nota
+                  </button>
+                </div>
                 <h6 class="fw-bold text-dark mb-0 text-truncate medium w-100">{{ expense.description }}</h6>
               </div>
               <div class="d-flex flex-column align-items-end text-end me-2" style="flex: 2; min-width: 0;">
@@ -225,22 +237,52 @@
           <p>Tidak ada pengeluaran ditemukan dengan filter saat ini.</p>
         </div>
       </div>
+
+      <!-- Quick Receipt Preview Modal -->
+      <ion-modal :is-open="showReceiptModal" @didDismiss="closeReceiptModal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Lampiran Nota</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeReceiptModal">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding text-center">
+          <div v-if="selectedReceipt" class="d-flex flex-column align-items-center justify-content-center h-100">
+            <div class="mb-3 text-start w-100 p-2 bg-light rounded border">
+              <div class="fw-bold text-dark fs-6">{{ selectedReceipt.expenseDescription }}</div>
+              <div class="text-primary fw-bold">{{ formatPrice(selectedReceipt.expenseAmount) }}</div>
+            </div>
+            <img
+              :src="selectedReceipt.url"
+              alt="Foto Nota"
+              style="max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+            />
+            <div class="mt-2 text-muted" style="font-size: 11px;">
+              {{ selectedReceipt.fileName || 'Nota' }} • {{ formatFileSize(selectedReceipt.size) }}
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
 
 <script>
 import { ref, computed, defineAsyncComponent, watch, nextTick } from 'vue'
-import { onIonViewWillEnter, IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, alertController } from '@ionic/vue';
-import { addOutline, trashOutline, pencilOutline, createOutline } from 'ionicons/icons';
-import { expensesRepo, savingAccountsRepo, savingTransactionsRepo } from '../../../db/repositories'
+import { onIonViewWillEnter, IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonModal, alertController } from '@ionic/vue';
+import { addOutline, trashOutline, pencilOutline, createOutline, documentAttachOutline, closeOutline } from 'ionicons/icons';
+import { expensesRepo, savingAccountsRepo, savingTransactionsRepo, expenseAttachmentsRepo } from '../../../db/repositories'
 import { db } from '../../../db/schema'
 import { useRouter } from 'vue-router'
 import { CHART_PALETTE, formatIDR, formatCompactNumber, getModernTooltip, getDonutTooltip, createAreaGradient } from '../../../utils/chartThemes'
 
 export default {
   name: 'AccountingExpensesListView',
-  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent },
+  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonModal },
   setup() {
     const router = useRouter()
     const activeTab = ref('dashboard')
@@ -282,8 +324,57 @@ export default {
       budgetCategories.value = Array.isArray(budgetCategoriesRecord?.value) ? budgetCategoriesRecord.value : []
     }
 
+    const selectedReceipt = ref(null)
+    const showReceiptModal = ref(false)
+
+    const viewReceipt = async (expense) => {
+      try {
+        const att = await expenseAttachmentsRepo.getByExpenseId(expense.id)
+        if (att && att.blob instanceof Blob) {
+          if (selectedReceipt.value?.url) {
+            URL.revokeObjectURL(selectedReceipt.value.url)
+          }
+          selectedReceipt.value = {
+            url: URL.createObjectURL(att.blob),
+            fileName: att.fileName || 'Nota.webp',
+            size: att.blob.size,
+            expenseDescription: expense.description,
+            expenseAmount: expense.amount
+          }
+          showReceiptModal.value = true
+        } else {
+          alert('Lampiran nota tidak ditemukan atau belum tersimpan.')
+        }
+      } catch (err) {
+        console.error('Failed to load receipt:', err)
+      }
+    }
+
+    const closeReceiptModal = () => {
+      if (selectedReceipt.value?.url) {
+        URL.revokeObjectURL(selectedReceipt.value.url)
+      }
+      selectedReceipt.value = null
+      showReceiptModal.value = false
+    }
+
+    const formatFileSize = (bytes) => {
+      if (!bytes || bytes <= 0) return '0 B'
+      if (bytes < 1024) return bytes + ' B'
+      const kb = bytes / 1024
+      if (kb < 1024) return kb.toFixed(1) + ' KB'
+      return (kb / 1024).toFixed(2) + ' MB'
+    }
+
     const fetchAll = async () => {
-      expenses.value = await expensesRepo.getAll()
+      const allExpenses = await expensesRepo.getAll()
+      const allAttachments = await expenseAttachmentsRepo.getAll()
+      const attachmentExpenseIds = new Set(allAttachments.map(a => a.expenseId))
+
+      expenses.value = allExpenses.map(e => ({
+        ...e,
+        hasAttachment: Boolean(e.hasAttachment || attachmentExpenseIds.has(e.id))
+      }))
       accounts.value = await savingAccountsRepo.getAll()
       await fetchBudget()
       nextTick(() => {
@@ -335,6 +426,7 @@ export default {
                   await savingTransactionsRepo.delete(item.savingTxId)
                 }
                 await expensesRepo.delete(id)
+                await expenseAttachmentsRepo.deleteByExpenseId(id)
                 await fetchAll()
               } catch (err) {
                 console.error('Failed to delete expense:', err)
@@ -621,7 +713,8 @@ export default {
       donutChartOption, hasDonutData, accounts, getAccountName, filterSearch,
       filterCategory, filterAccount, allCategories, filteredExpenses,
       dailyChartOption, hasDailyData, monthlyChartOption, hasMonthlyData,
-      categoryPeriodMonths
+      categoryPeriodMonths, selectedReceipt, showReceiptModal, viewReceipt,
+      closeReceiptModal, formatFileSize, documentAttachOutline, closeOutline
     }
   }
 }
