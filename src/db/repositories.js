@@ -2,11 +2,29 @@ import { db } from './schema';
 
 const sanitizeData = (data) => {
   if (data === undefined || data === null) return data;
-  try {
-    return JSON.parse(JSON.stringify(data));
-  } catch (e) {
-    return data;
+  if (data instanceof Blob) return data;
+  if (typeof data !== 'object') return data;
+
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeData(item));
   }
+
+  const copy = {};
+  for (const key of Object.keys(data)) {
+    const val = data[key];
+    if (val instanceof Blob) {
+      copy[key] = val;
+    } else if (typeof val === 'object' && val !== null) {
+      try {
+        copy[key] = JSON.parse(JSON.stringify(val));
+      } catch (e) {
+        copy[key] = val;
+      }
+    } else {
+      copy[key] = val;
+    }
+  }
+  return copy;
 };
 
 // Category Repository
@@ -107,6 +125,38 @@ export const salesRepo = createRepo('sales');
 export const stockMutationsRepo = createRepo('stockMutations');
 export const savingAccountsRepo = createRepo('saving_accounts');
 export const savingTransactionsRepo = createRepo('saving_transactions');
+
+export const expenseAttachmentsRepo = {
+  ...createRepo('expense_attachments'),
+  async getByExpenseId(expenseId) {
+    if (!expenseId) return null;
+    return await db.expense_attachments.where('expenseId').equals(Number(expenseId)).first();
+  },
+  async getAllByExpenseId(expenseId) {
+    if (!expenseId) return [];
+    return await db.expense_attachments.where('expenseId').equals(Number(expenseId)).toArray();
+  },
+  async deleteByExpenseId(expenseId) {
+    if (!expenseId) return;
+    return await db.expense_attachments.where('expenseId').equals(Number(expenseId)).delete();
+  }
+};
+
+export const transactionAttachmentsRepo = {
+  ...createRepo('transaction_attachments'),
+  async getByTransactionId(transactionId) {
+    if (!transactionId) return null;
+    return await db.transaction_attachments.where('transactionId').equals(Number(transactionId)).first();
+  },
+  async getAllByTransactionId(transactionId) {
+    if (!transactionId) return [];
+    return await db.transaction_attachments.where('transactionId').equals(Number(transactionId)).toArray();
+  },
+  async deleteByTransactionId(transactionId) {
+    if (!transactionId) return;
+    return await db.transaction_attachments.where('transactionId').equals(Number(transactionId)).delete();
+  }
+};
 
 
 

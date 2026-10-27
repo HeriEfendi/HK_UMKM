@@ -142,6 +142,60 @@ db.version(11).stores({
   note_labels: '++id, name'
 });
 
+// Version 12: Add expense_attachments and transaction_attachments for receipt photos / invoices
+db.version(12).stores({
+  projects: 'id',
+  todos: 'id',
+  team_todos: 'id',
+  users: 'id',
+  transactions: 'id, project_id',
+  ceklok_logs: 'id',
+  ceklok_settings: 'key',
+  categories: 'id, name',
+  products: '++id, name, price, stock, categoryId, featured',
+  savings: '++id, createdAt, name, amount',
+  debts: '++id, createdAt, name, amount, dueDate',
+  incomes: '++id, createdAt, name, amount',
+  expenses: '++id, createdAt, description, amount, date, category',
+  dailyLedger: '++id, createdAt, description, amount, type',
+  sales: '++id, createdAt, totalAmount, paymentMethod, amountPaid, changeAmount, items, notes',
+  stockMutations: '++id, productId, type, changeQuantity, beforeStock, afterStock, createdAt, notes',
+  saving_accounts: '++id, name, category',
+  saving_transactions: '++id, accountId, type, date',
+  reminders: '++id, date, recurring',
+  notes: '++id, title, isPinned, isArchived, isTrashed, color, createdAt, updatedAt',
+  note_labels: '++id, name',
+  expense_attachments: '++id, expenseId, createdAt',
+  transaction_attachments: '++id, transactionId, createdAt'
+});
+
+// Version 13: Ensure transaction_attachments store is available on upgrade
+db.version(13).stores({
+  projects: 'id',
+  todos: 'id',
+  team_todos: 'id',
+  users: 'id',
+  transactions: 'id, project_id',
+  ceklok_logs: 'id',
+  ceklok_settings: 'key',
+  categories: 'id, name',
+  products: '++id, name, price, stock, categoryId, featured',
+  savings: '++id, createdAt, name, amount',
+  debts: '++id, createdAt, name, amount, dueDate',
+  incomes: '++id, createdAt, name, amount',
+  expenses: '++id, createdAt, description, amount, date, category',
+  dailyLedger: '++id, createdAt, description, amount, type',
+  sales: '++id, createdAt, totalAmount, paymentMethod, amountPaid, changeAmount, items, notes',
+  stockMutations: '++id, productId, type, changeQuantity, beforeStock, afterStock, createdAt, notes',
+  saving_accounts: '++id, name, category',
+  saving_transactions: '++id, accountId, type, date',
+  reminders: '++id, date, recurring',
+  notes: '++id, title, isPinned, isArchived, isTrashed, color, createdAt, updatedAt',
+  note_labels: '++id, name',
+  expense_attachments: '++id, expenseId, createdAt',
+  transaction_attachments: '++id, transactionId, createdAt'
+});
+
 let databaseSeeded = false;
 
 export async function seedDatabase() {
