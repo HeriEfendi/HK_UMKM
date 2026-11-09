@@ -1,8 +1,7 @@
 <template>
   <ion-page>
-    <AppSidebar />
     <AppHeader />
-    <ion-content id="main-content">
+    <ion-content>
       <div class="ion-padding">
         <ion-router-outlet />
       </div>
@@ -13,7 +12,6 @@
 <script>
 import { IonPage, IonContent, IonRouterOutlet } from '@ionic/vue';
 import AppHeader from './AppHeader.vue'
-import AppSidebar from './AppSidebar.vue'
 import { computed, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute } from 'vue-router'
@@ -22,7 +20,6 @@ export default {
   name: 'DefaultLayout',
   components: {
     AppHeader,
-    AppSidebar,
     IonPage,
     IonContent,
     IonRouterOutlet
