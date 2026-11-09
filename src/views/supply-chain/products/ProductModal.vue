@@ -157,8 +157,6 @@ const openCamera = async () => {
   try {
     const base64 = await captureFromCamera();
     if (base64) {
-      const fileName = await saveProductImageFromBase64(base64, Date.now());
-      props.product.image = fileName;
       applyBase64(base64);
     }
   } catch (error: any) {
@@ -181,8 +179,6 @@ const openGallery = async () => {
     try {
         const base64 = await pickFromGallery();
         if (base64) {
-          const fileName = await saveProductImageFromBase64(base64, Date.now());
-          props.product.image = fileName;
           applyBase64(base64);
         }
     } catch (err: any) {

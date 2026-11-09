@@ -106,7 +106,7 @@
 <script>
 import { ref, computed, onMounted } from 'vue'
 import { CategoryRepository, ProductRepository } from '../../../db/repositories'
-import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonAlert, toastController } from '@ionic/vue';
+import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonAlert, toastController, onIonViewWillEnter } from '@ionic/vue';
 import {
   addOutline, trashOutline, createOutline, listOutline,
   fastFoodOutline, cafeOutline, shirtOutline, colorPaletteOutline,
@@ -195,6 +195,7 @@ export default {
     }
 
     onMounted(fetch)
+    onIonViewWillEnter(fetch)
 
     return {
       categories, products, enrichedCategories, totalProductCount, totalInventoryValue,

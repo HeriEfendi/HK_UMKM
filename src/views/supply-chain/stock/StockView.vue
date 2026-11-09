@@ -293,6 +293,7 @@ import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIco
 import { basketOutline, addOutline, removeOutline, downloadOutline, calendarOutline, documentTextOutline, searchOutline } from 'ionicons/icons';
 import { readProductImage } from '../../../composables/useProductImage';
 import * as XLSX from 'xlsx';
+import { exportWorkbookToExcel } from '../../../utils/excelExport';
 
 export default {
   name: 'StockView',
@@ -448,7 +449,7 @@ export default {
     }
 
     // Export Excel
-    const exportExcel = () => {
+    const exportExcel = async () => {
       if (mutations.value.length === 0) {
         showToast('Tidak ada data mutasi untuk diekspor!', 'warning')
         return
@@ -470,7 +471,7 @@ export default {
 
       worksheet['!cols'] = Array(7).fill({ wch: 18 })
 
-      XLSX.writeFile(workbook, `Laporan_Mutasi_Stok_SME_${new Date().toISOString().split('T')[0]}.xlsx`)
+      await exportWorkbookToExcel(workbook, `Laporan_Mutasi_Stok_SME_${new Date().toISOString().split('T')[0]}.xlsx`)
       showToast('Laporan Mutasi Excel berhasil diunduh!', 'success')
     }
 

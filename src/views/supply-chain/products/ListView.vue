@@ -301,6 +301,10 @@ export default {
 
     const deleteProduct = async () => {
       if (deleteId.value !== null) {
+        const prod = products.value.find(p => p.id === deleteId.value)
+        if (prod?.image) {
+          await deleteProductImage(prod.image)
+        }
         await ProductRepository.delete(deleteId.value)
         const toast = await toastController.create({
           message: 'Produk berhasil dihapus!',
