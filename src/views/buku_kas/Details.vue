@@ -915,27 +915,6 @@ onMounted(async () => {
   await migrateProjectTransactions()
   await fetchProject()
 })
-
-
-const chartCarousel = ref(null)
-let interval: any = null
-
-onMounted(() => {
-  if (window.innerWidth < 992) { // Use 'lg' breakpoint
-    let active = 0
-    interval = setInterval(() => {
-      active = active === 0 ? 1 : 0
-      if (chartCarousel.value) {
-        (chartCarousel.value as any).scrollTo({
-          left: active * (chartCarousel.value as any).offsetWidth,
-          behavior: 'smooth'
-        })
-      }
-    }, 5000)
-  }
-})
-
-onUnmounted(() => clearInterval(interval))
 </script>
 
 <template>
@@ -1259,7 +1238,7 @@ onUnmounted(() => clearInterval(interval))
                 </div>
                 <div class="form-section">
                     <label class="form-label">Deskripsi</label>
-                    <input type="text" v-model="formTx.description" class="form-control app-control form-control-textarea" />
+                    <textarea v-model="formTx.description" rows="3" class="form-control app-control"></textarea>
                 </div>
 
                 <!-- LAMPIRAN NOTA / BUKTI BAYAR -->

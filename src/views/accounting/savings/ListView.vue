@@ -6,14 +6,14 @@
         <div class="app-hero">
           <div class="d-flex align-items-center justify-content-between">
             <ion-title class="app-hero-title">Tabungan & Aset</ion-title>
-            <!-- <div class="d-flex gap-2">
+            <div class="d-flex gap-2">
               <ion-button class="btn-action secondary btn-sm" @click="openTransferModal">
                 <ion-icon slot="start" :icon="swapHorizontalOutline" /> Transfer
               </ion-button>
               <ion-button class="btn-action primary btn-sm" @click="openTxModal('DEPOSIT')">
                 <ion-icon slot="start" :icon="addOutline" /> Setor/Tarik
               </ion-button>
-            </div> -->
+            </div>
           </div>
           <p class="app-hero-subtitle">Kelola akun bank, simpanan, dan mutasi aset keuangan Anda.</p>
         </div>
@@ -668,11 +668,10 @@ export default {
       const now = new Date()
       
       for (let i = 5; i >= 0; i--) {
-        const m = new Date()
-        m.setMonth(m.getMonth() - (5 - i))
+        const m = new Date(now.getFullYear(), now.getMonth() - i, 1)
         categories.push(m.toLocaleDateString('id-ID', { month: 'short' }))
 
-        const targetMonthDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 0)
+        const targetMonthDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999)
         const balanceUpToMonth = transactions.value
           .filter(t => new Date(t.date || t.createdAt) <= targetMonthDate)
           .reduce((sum, t) => {

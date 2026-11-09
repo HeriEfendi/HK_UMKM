@@ -346,38 +346,17 @@ export default {
       let result = [...incomes.value]
       if (filterSearch.value.trim()) {
         const q = filterSearch.value.toLowerCase()
-        result = result.filter(e => (e.description || '').toLowerCase().includes(q))
+        result = result.filter(e =>
+          (e.description || '').toLowerCase().includes(q) ||
+          (e.name || '').toLowerCase().includes(q) ||
+          (e.category || '').toLowerCase().includes(q)
+        )
       }
       if (filterCategory.value) {
         result = result.filter(e => (e.category || 'Umum') === filterCategory.value)
       }
       return result.sort((a, b) => new Date(b.date) - new Date(a.date))
     })
-
-    // Charts
-    const dailyChartSeries = computed(() => {
-      const data = [];
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const dayOfWeek = today.getDay() || 7;
-      const monday = new Date(today); monday.setDate(today.getDate() - (dayOfWeek - 1));
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(monday); d.setDate(monday.getDate() + i);
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-        const val = incomes.value.filter(e => e.date && e.date.startsWith(dateStr)).reduce((s, e) => s + Number(e.amount), 0);
-        data.push(val);
-      }
-      return [{ name: 'Pendapatan', data }];
-    });
-
-    const dailyChartOptions = {
-      chart: { toolbar: { show: false }, type: 'bar', zoom: { enabled: false } },
-      colors: ['#10b981'],
-      plotOptions: { bar: { borderRadius: 6, columnWidth: '50%', dataLabels: { position: 'top' } } },
-      dataLabels: { enabled: true, formatter: (val) => val > 0 ? new Intl.NumberFormat('id-ID').format(val) : '', offsetY: -20 },
-      xaxis: { categories: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'] },
-      yaxis: { labels: { formatter: (val) => new Intl.NumberFormat('id-ID').format(val) } },
-      tooltip: { y: { formatter: (val) => 'Rp ' + new Intl.NumberFormat('id-ID').format(val) } }
-    };
 
     // Weekly trend
     const weeklyChartOption = computed(() => {

@@ -116,15 +116,15 @@
                 <span class="badge me-2" :class="d.type === 'receivable' ? 'bg-success' : 'bg-warning text-dark'">
                   {{ d.type === 'receivable' ? '📥 Piutang Kasbon' : '📤 Utang Saya' }}
                 </span>
-                <span class="fw-bold text-dark small">{{ d.description }}</span>
+                <span class="fw-bold text-dark small">{{ d.notes || d.description || d.lender }}</span>
                 <div class="text-muted text-xs">Jatuh tempo: {{ formatDate(d.dueDate) }}</div>
               </div>
               <div class="text-end">
                 <div class="fw-bold" :class="d.type === 'receivable' ? 'text-success' : 'text-danger'">
                   {{ formatPrice(d.amount) }}
                 </div>
-                <span class="badge" :class="d.status === 'PAID' ? 'bg-light text-success border' : 'bg-danger-subtle text-danger border'">
-                  {{ d.status === 'PAID' ? 'Lunas' : 'Belum Lunas' }}
+                <span class="badge" :class="isDebtPaid(d) ? 'bg-light text-success border' : 'bg-danger-subtle text-danger border'">
+                  {{ isDebtPaid(d) ? 'Lunas' : 'Belum Lunas' }}
                 </span>
               </div>
             </div>
@@ -233,6 +233,12 @@ export default {
       }
     }
 
+    const isDebtPaid = (d) => {
+      if (!d) return false
+      if (d.status === 'Lunas' || d.status === 'Paid' || d.status === 'PAID') return true
+      return Number(d.paidAmount || 0) >= Number(d.amount || 0) && Number(d.amount || 0) > 0
+    }
+
     const openHistoryModal = async (contact) => {
       selectedContact.value = contact
       historyModalVisible.value = true
@@ -241,13 +247,13 @@ export default {
         const allDebts = await debtsRepo.getAll()
         const allSales = await salesRepo.getAll()
 
-        const nameLower = (contact.name || '').toLowerCase()
+        const nameLower = (contact.name || '').toLowerCase().trim()
         const phoneClean = (contact.phone || '').replace(/\D/g, '')
 
         contactDebts.value = allDebts.filter(d => {
-          const dName = (d.personName || '').toLowerCase()
+          const dName = (d.lender || d.personName || '').toLowerCase().trim()
           const dPhone = (d.phone || '').replace(/\D/g, '')
-          return (nameLower && dName.includes(nameLower)) || (phoneClean && dPhone && dPhone === phoneClean)
+          return (nameLower && dName && (dName.includes(nameLower) || nameLower.includes(dName))) || (phoneClean && dPhone && dPhone === phoneClean)
         })
 
         contactSales.value = allSales.filter(s => {
@@ -276,7 +282,7 @@ export default {
     onIonViewWillEnter(fetchUsers)
 
     return { 
-      users, loading, searchQuery, filteredUsers, deleteUser, formatDate, formatPrice,
+      users, loading, searchQuery, filteredUsers, deleteUser, formatDate, formatPrice, isDebtPaid,
       addOutline, trashOutline, createOutline, receiptOutline, callOutline, peopleOutline, closeOutline, logoWhatsapp,
       editModalVisible, selectedUserId, editUser, createUser, fetchUsers,
       historyModalVisible, selectedContact, contactDebts, contactSales, openHistoryModal, openWhatsApp

@@ -408,7 +408,7 @@ onIonViewWillEnter(fetchProjects)
           </div>
           <div class="form-section">
             <label class="form-label">Deskripsi</label>
-            <input type="text" v-model="activeProject.description" class="form-control app-control form-control-textarea" />
+            <textarea v-model="activeProject.description" rows="3" class="form-control app-control"></textarea>
           </div>
         </div>
       </ion-content>
