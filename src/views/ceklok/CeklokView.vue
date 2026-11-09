@@ -516,6 +516,7 @@ import {
 } from 'ionicons/icons';
 import { CeklokRepository } from '@/db/ceklokRepository';
 import * as XLSX from 'xlsx';
+import { exportWorkbookToExcel } from '@/utils/excelExport';
 import { getModernTooltip, createAreaGradient } from '@/utils/chartThemes';
 
 export default {
@@ -591,7 +592,7 @@ export default {
       if (!settings.value.workStart) return '08:00';
       const [h, m] = settings.value.workStart.split(':').map(Number);
       const tolerance = settings.value.toleranceMinutes || 0;
-      const totalMinutes = (h * 60 + m) - tolerance;
+      const totalMinutes = (((h * 60 + m) - tolerance) % 1440 + 1440) % 1440;
       const finalH = Math.floor(totalMinutes / 60) % 24;
       const finalM = totalMinutes % 60;
       return `${String(finalH).padStart(2, '0')}:${String(finalM).padStart(2, '0')}`;
@@ -601,7 +602,7 @@ export default {
       if (!settings.value.workEnd) return '17:00';
       const [h, m] = settings.value.workEnd.split(':').map(Number);
       const tolerance = settings.value.toleranceMinutes || 0;
-      const totalMinutes = (h * 60 + m) + tolerance;
+      const totalMinutes = (((h * 60 + m) + tolerance) % 1440 + 1440) % 1440;
       const finalH = Math.floor(totalMinutes / 60) % 24;
       const finalM = totalMinutes % 60;
       return `${String(finalH).padStart(2, '0')}:${String(finalM).padStart(2, '0')}`;
@@ -633,8 +634,8 @@ export default {
 
       // Apply auto-deduct breaks
       const freshSettings = await CeklokRepository.getSettings();
-      const dateStr = activeLog.value.clockIn.split('T')[0];
       const clockInTime = new Date(activeLog.value.clockIn);
+      const dateStr = activeLog.value.date || getLocalDateString(clockInTime);
 
       freshSettings.breaks.forEach(bc => {
         if (!bc.autoDeduct) return;
@@ -711,7 +712,7 @@ export default {
       // ── AUTO-STOP: trigger if now >= workEnd + tolerance ──
       const cfg = settings.value;
       if (cfg.workEnd && activeLog.value && !activeLog.value.clockOut) {
-        const dateStr = activeLog.value.clockIn.split('T')[0];
+        const dateStr = activeLog.value.date || getLocalDateString(new Date(activeLog.value.clockIn));
         const workEndMs = new Date(`${dateStr}T${cfg.workEnd}:00`).getTime();
         const cutoffMs = workEndMs + (cfg.toleranceMinutes || 0) * 60000;
         if (now.getTime() >= cutoffMs) {
@@ -787,69 +788,11 @@ export default {
         activeLog.value = await CeklokRepository.addLog(newLog);
         localNotes.value = '';
         timerInterval = setInterval(updateActiveTimer, 1000);
+        await loadState();
       } else {
-        // Clock Out
-        const now = new Date();
-        
-        // If there's an ongoing break, finish it first
-        if (activeBreak.value) {
-          await endBreak();
-        }
-
-        // Apply auto-deduct breaks configured in settings
-        const freshSettings = await CeklokRepository.getSettings();
-        const dateStr = activeLog.value.clockIn.split('T')[0];
-        const clockInTime = new Date(activeLog.value.clockIn);
-        
-        freshSettings.breaks.forEach(bc => {
-          if (!bc.autoDeduct) return;
-          const breakStart = new Date(`${dateStr}T${bc.start}:00`);
-          const breakEnd = new Date(`${dateStr}T${bc.end}:00`);
-
-          // Shift fully contains the break
-          if (clockInTime <= breakStart && now >= breakEnd) {
-            // Check if there is already a manual break logged with the same name
-            const exists = activeLog.value.breaks.some(b => b.name === bc.name);
-            if (!exists) {
-              activeLog.value.breaks.push({
-                name: bc.name + ' (Auto)',
-                start: breakStart.toISOString(),
-                end: breakEnd.toISOString(),
-                durationMinutes: bc.duration
-              });
-            }
-          }
-        });
-
-        // Calculate final working hours: ClockOut - ClockIn - Sum(breaks duration)
-        const clockInMs = new Date(activeLog.value.clockIn).getTime();
-        const clockOutMs = now.getTime();
-        let diffMs = clockOutMs - clockInMs;
-
-        let totalBreakMinutes = 0;
-        activeLog.value.breaks.forEach(b => {
-          totalBreakMinutes += b.durationMinutes;
-        });
-
-        diffMs = Math.max(0, diffMs - (totalBreakMinutes * 60000));
-        const totalWorkHours = diffMs / 3600000;
-
-        await CeklokRepository.updateLog(activeLog.value.id, {
-          clockOut: now.toISOString(),
-          breaks: JSON.parse(JSON.stringify(activeLog.value.breaks)),
-          notes: localNotes.value,
-          totalWorkHours: totalWorkHours
-        });
-
-        activeLog.value = null;
-        localNotes.value = '';
-        if (timerInterval) {
-          clearInterval(timerInterval);
-          timerInterval = null;
-        }
-        liveDurationStr.value = '00:00:00';
+        // ── CLOCK OUT ──
+        await performClockOut(new Date(), false);
       }
-      await loadState();
     };
 
     // Auto-save notes in ongoing shift when focus lost
@@ -1111,7 +1054,7 @@ export default {
       });
       worksheet['!cols'] = Object.keys(maxLens).map(key => ({ wch: maxLens[key] + 2 }));
 
-      XLSX.writeFile(workbook, `Rekap_Presensi_Kerja_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      await exportWorkbookToExcel(workbook, `Rekap_Presensi_Kerja_${getLocalDateString()}.xlsx`);
       const toast = await toastController.create({
         message: 'File Excel rekap presensi berhasil diunduh!',
         duration: 2500,
@@ -1293,29 +1236,10 @@ export default {
 
     const monthlyPeriodRange = computed(() => {
       const now = new Date();
-      if (settings.value.cutoffType === 'weekly') {
-        const getFirstFri = (d) => {
-          let day = new Date(d.getFullYear(), d.getMonth(), 1);
-          while (day.getDay() !== 5) day.setDate(day.getDate() + 1);
-          return day;
-        };
-        const getNextMonthFirstFri = (d) => {
-          let day = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-          while (day.getDay() !== 5) day.setDate(day.getDate() + 1);
-          return day;
-        };
-        const start = getFirstFri(now);
-        const end = new Date(getNextMonthFirstFri(now));
-        end.setDate(end.getDate() - 1);
-        return `${start.getDate()} ${start.toLocaleString('id-ID', { month: 'short' })} - ${end.getDate()} ${end.toLocaleString('id-ID', { month: 'short' })}`;
-      } else {
-        const start = getStartOfMonthlyPeriod(now, settings.value.cutoffDate);
-        const end = new Date(start.getTime());
-        end.setMonth(end.getMonth() + 1);
-        const lastDay = new Date(end);
-        lastDay.setDate(lastDay.getDate() - 1);
-        return `${start.getDate()} ${start.toLocaleString('id-ID', { month: 'short' })} - ${lastDay.getDate()} ${lastDay.toLocaleString('id-ID', { month: 'short' })}`;
-      }
+      const { start, end } = getMonthlyPeriodDates(now, settings.value);
+      const lastDay = new Date(end);
+      lastDay.setDate(lastDay.getDate() - 1);
+      return `${start.getDate()} ${start.toLocaleString('id-ID', { month: 'short' })} - ${lastDay.getDate()} ${lastDay.toLocaleString('id-ID', { month: 'short' })}`;
     });
 
     // Charts Config & Series
@@ -1427,10 +1351,7 @@ export default {
 
     const monthlyChartOption = computed(() => {
       const now = new Date();
-      const baseMonth = now.getDate() <= settings.value.cutoffDate ? now.getMonth() - 1 : now.getMonth();
-      const cutoff = settings.value.cutoffDate;
-      const periodStart = new Date(now.getFullYear(), baseMonth, cutoff + 1);
-      const periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, cutoff + 1);
+      const { start: periodStart, end: periodEnd } = getMonthlyPeriodDates(now, settings.value);
 
       const logsInPeriod = logs.value.filter(log => {
         const d = new Date(log.clockIn);
@@ -1568,7 +1489,8 @@ export default {
       monthlyPeriodRange,
       settingsOutline, playOutline, stopOutline, cafeOutline, calendarOutline, 
       createOutline, trashOutline, downloadOutline, addOutline,
-      effectiveStartStr
+      effectiveStartStr,
+      effectiveEndStr
     };
   }
 }
