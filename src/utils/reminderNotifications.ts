@@ -123,10 +123,10 @@ export async function scheduleReminderNotifications(reminders: ReminderItem[]) {
         const [hh, mm2] = (r.notifyTime || '08:00').split(':').map(Number)
         const leadDays = r.notifyMode === '7_days' ? 7 : r.notifyMode === '3_days' ? 3 : 0
 
+        const [ny, nm, nd] = nextDate.split('-').map(Number)
+
         for (let offset = leadDays; offset >= 0; offset--) {
-          const atDate = new Date(nextDate)
-          atDate.setDate(atDate.getDate() - offset)
-          atDate.setHours(hh, mm2, 0, 0)
+          const atDate = new Date(ny, nm - 1, nd - offset, hh, mm2, 0, 0)
 
           if (atDate <= new Date()) continue
 

@@ -100,10 +100,10 @@ export function getNextOccurrence(r: ReminderItem): string | null {
     }
 
     case 'weekly': {
-      // Hari dalam seminggu sama dengan hari di r.date
-      const parts = r.date.split('-').map(Number)
-      const refDate = new Date(parts[0], parts[1] - 1, parts[2])
-      const targetDay = refDate.getDay()
+      // Hari dalam seminggu dari recurringDays[0] atau dari r.date
+      const parts = (r.date || '').split('-').map(Number)
+      const refDate = parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date()
+      const targetDay = (r.recurringDays && r.recurringDays.length > 0) ? r.recurringDays[0] : refDate.getDay()
       const now = new Date()
       const diff = (targetDay - now.getDay() + 7) % 7
       const next = new Date()

@@ -169,12 +169,15 @@
               <div class="col-6">
                 <label class="form-label">Kategori</label>
                 <select v-model="form.category" class="form-select app-control">
+                  <option>Bisnis</option>
+                  <option>Keuangan</option>
+                  <option>Stok</option>
+                  <option>Operasional</option>
                   <option>Ulang Tahun</option>
                   <option>Pertemuan</option>
                   <option>Deadline</option>
                   <option>Liburan</option>
                   <option>Kesehatan</option>
-                  <option>Keuangan</option>
                   <option>Umum</option>
                 </select>
               </div>
@@ -444,9 +447,21 @@ const businessTemplates = [
 
 function applyBusinessTemplate(tpl: typeof businessTemplates[0]) {
   const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const dateStr = `${year}-${month}-${String(tpl.recurringDayOfMonth || 15).padStart(2, '0')}`
+  let dateStr = ''
+  if (tpl.recurringType === 'weekly' && tpl.recurringDays && tpl.recurringDays.length > 0) {
+    const targetDay = tpl.recurringDays[0]
+    const diff = (targetDay - today.getDay() + 7) % 7
+    const nextDate = new Date(today)
+    nextDate.setDate(today.getDate() + diff)
+    const y = nextDate.getFullYear()
+    const m = String(nextDate.getMonth() + 1).padStart(2, '0')
+    const d = String(nextDate.getDate()).padStart(2, '0')
+    dateStr = `${y}-${m}-${d}`
+  } else {
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    dateStr = `${year}-${month}-${String(tpl.recurringDayOfMonth || 15).padStart(2, '0')}`
+  }
 
   form.value = {
     title: tpl.title,
@@ -530,6 +545,7 @@ function getUrgencyClass(r: ReminderItem) {
 
 function getCategoryClass(cat?: string) {
   const map: Record<string, string> = {
+    'Bisnis': 'primary', 'Stok': 'info', 'Operasional': 'warning',
     'Ulang Tahun': 'primary', 'Pertemuan': 'progress', 'Deadline': 'todo',
     'Liburan': 'done', 'Kesehatan': 'secondary', 'Keuangan': 'high', 'Umum': 'secondary'
   }
@@ -538,7 +554,9 @@ function getCategoryClass(cat?: string) {
 
 function formatDisplayDate(r: ReminderItem) {
   const d = getNextOccurrence(r) ?? r.date
-  return new Date(d).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const parts = String(d).split('-').map(Number)
+  const dateObj = parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date(d)
+  return dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 function toggleDay(day: number) {
