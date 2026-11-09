@@ -571,7 +571,7 @@
               <span>{{ formatPrice(activeSale.subtotal || getSaleSubtotal(activeSale)) }}</span>
             </div>
             <div class="d-flex justify-content-between mb-1 text-danger" v-if="activeSale.discountAmount > 0 || getSaleDiscount(activeSale) > 0">
-              <span>Diskon ({{ activeSale.discount || 0 }}%):</span>
+              <span>Diskon{{ activeSale.discountType === 'fixed' ? '' : ` (${activeSale.discount || 0}%)` }}:</span>
               <span>-{{ formatPrice(activeSale.discountAmount || getSaleDiscount(activeSale)) }}</span>
             </div>
             <div class="d-flex justify-content-between mb-1" v-if="(activeSale.taxAmount || getSaleTax(activeSale)) > 0">
@@ -672,7 +672,7 @@
             <span>{{ formatPrice(activeSale.subtotal || getSaleSubtotal(activeSale)) }}</span>
           </div>
           <div style="display: flex; justify-content: space-between; color: red;" v-if="activeSale.discountAmount > 0 || getSaleDiscount(activeSale) > 0">
-            <span>Diskon ({{ activeSale.discount || 0 }}%):</span>
+            <span>Diskon{{ activeSale.discountType === 'fixed' ? '' : ` (${activeSale.discount || 0}%)` }}:</span>
             <span>-{{ formatPrice(activeSale.discountAmount || getSaleDiscount(activeSale)) }}</span>
           </div>
           <div style="display: flex; justify-content: space-between;" v-if="(activeSale.taxAmount || getSaleTax(activeSale)) > 0">
@@ -714,6 +714,7 @@ import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIco
 import { addOutline, removeOutline, trashOutline, cartOutline, basketOutline, printOutline, downloadOutline, calendarOutline, documentTextOutline, logoWhatsapp, searchOutline as searchIcon } from 'ionicons/icons';
 import { readProductImage } from '../../composables/useProductImage';
 import * as XLSX from 'xlsx';
+import { exportWorkbookToExcel } from '../../utils/excelExport';
 import { getModernTooltip, formatCompactNumber, createAreaGradient } from '../../utils/chartThemes';
 
 export default {
@@ -788,8 +789,6 @@ export default {
         }, 100)
       })
     }
-
-    onMounted(loadData)
 
     // POS Products Filter
     const filteredProducts = computed(() => {
@@ -1111,13 +1110,20 @@ export default {
       return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
     }
 
+    const toLocalDateStr = (d) => {
+      const dt = d instanceof Date ? d : new Date(d)
+      if (isNaN(dt.getTime())) return ''
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+    }
+
     // Monitoring KPI Analytics Computations
     const kpiMetrics = computed(() => {
-      const todayStr = new Date().toISOString().split('T')[0]
-      const currentMonth = new Date().getMonth()
-      const currentYear = new Date().getFullYear()
+      const now = new Date()
+      const todayStr = toLocalDateStr(now)
+      const currentMonth = now.getMonth()
+      const currentYear = now.getFullYear()
 
-      const todaySales = salesHistory.value.filter(s => s.createdAt.startsWith(todayStr))
+      const todaySales = salesHistory.value.filter(s => s.createdAt && toLocalDateStr(s.createdAt) === todayStr)
       const monthSales = salesHistory.value.filter(s => {
         const d = new Date(s.createdAt)
         return d.getMonth() === currentMonth && d.getFullYear() === currentYear
@@ -1162,8 +1168,8 @@ export default {
       for (let i = 6; i >= 0; i--) {
         const d = new Date()
         d.setDate(today.getDate() - i)
-        const dateStr = d.toISOString().split('T')[0]
-        const daySales = salesHistory.value.filter(s => s.createdAt && s.createdAt.startsWith(dateStr))
+        const dateStr = toLocalDateStr(d)
+        const daySales = salesHistory.value.filter(s => s.createdAt && toLocalDateStr(s.createdAt) === dateStr)
         const dayTotal = daySales.reduce((sum, s) => sum + (s.totalAmount || 0), 0)
         if (dayTotal > 0) return true
       }
@@ -1178,10 +1184,10 @@ export default {
       for (let i = 6; i >= 0; i--) {
         const d = new Date()
         d.setDate(today.getDate() - i)
-        const dateStr = d.toISOString().split('T')[0]
+        const dateStr = toLocalDateStr(d)
         categoriesData.push(d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric' }))
 
-        const daySales = salesHistory.value.filter(s => s.createdAt && s.createdAt.startsWith(dateStr))
+        const daySales = salesHistory.value.filter(s => s.createdAt && toLocalDateStr(s.createdAt) === dateStr)
         const dayTotal = daySales.reduce((sum, s) => sum + (s.totalAmount || 0), 0)
         seriesData.push(Number.isFinite(dayTotal) ? dayTotal : 0)
       }
@@ -1236,7 +1242,7 @@ export default {
     })
 
     // Export Sales History report to Excel
-    const exportExcel = () => {
+    const exportExcel = async () => {
       if (salesHistory.value.length === 0) {
         showToast('Tidak ada data transaksi untuk diekspor!', 'warning')
         return
@@ -1273,7 +1279,7 @@ export default {
       const max_width = rows.reduce((w, r) => Math.max(w, Object.keys(r).length), 10)
       worksheet['!cols'] = Array(max_width).fill({ wch: 18 })
 
-      XLSX.writeFile(workbook, `Laporan_Kasir_SME_${new Date().toISOString().split('T')[0]}.xlsx`)
+      await exportWorkbookToExcel(workbook, `Laporan_Kasir_SME_${toLocalDateStr(new Date())}.xlsx`)
       showToast('Laporan Excel berhasil diunduh!', 'success')
     }
 
