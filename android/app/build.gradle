@@ -9,6 +9,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "0.23.0"
+        base.archivesName = "hk-umkm-${versionName}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -21,16 +22,6 @@ android {
             minifyEnabled true // Mengaktifkan pengecil kode
             shrinkResources true // Mengaktifkan penghapus aset tidak terpakai
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
-
-    // Rename output APK: [nama-proyek]-[versi]-apprealis.apk
-    applicationVariants.all { variant ->
-        variant.outputs.all { output ->
-            def appName = "hk-umkm"
-            def versionName = variant.versionName
-            def buildType = variant.buildType.name
-            outputFileName = "${appName}-${versionName}-${buildType}.apk"
         }
     }
 }
