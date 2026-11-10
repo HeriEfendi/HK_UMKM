@@ -62,19 +62,11 @@
         <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between mb-3">
           <!-- Search input -->
           <div class="w-100 px-3 py-1 search-container">
-            <div class="search-input-wrap position-relative">
-              <input 
-                type="text" 
-                v-model="searchQuery" 
-                class="form-control form-control-sm app-control" 
-                style="padding-left: 30px;" 
-                placeholder="Cari produk..." 
-              />
-              <ion-icon 
-                :icon="searchOutline" 
-                style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 1rem; color: #94a3b8;" 
-              />
-            </div>
+            <SearchInput 
+              v-model="searchQuery" 
+              placeholder="Cari produk..." 
+              size="sm" 
+            />
           </div>
 
           <!-- Filter chips -->
@@ -104,14 +96,16 @@
         </div>
 
         <!-- Products List for stock adjustment -->
-        <div v-if="filteredProducts.length === 0" class="empty-state text-center py-5 mobile-card">
-          <ion-icon :icon="basketOutline" style="font-size: 3rem;" class="text-muted mb-2" />
-          <p class="text-muted">Tidak ada produk yang sesuai dengan filter.</p>
-        </div>
+        <EmptyState
+          v-if="filteredProducts.length === 0"
+          :icon="basketOutline"
+          title="Tidak Ada Produk"
+          message="Tidak ada produk yang sesuai dengan filter atau kata kunci."
+        />
 
         <div v-else class="row mx-2">
           <div 
-            v-for="prod in filteredProducts" 
+            v-for="prod in displayedProducts" 
             :key="prod.id" 
             class="col-12 col-md-6 g-2"
           >
@@ -140,6 +134,15 @@
               </div>
             </div>
           </div>
+
+          <LoadMoreFooter
+            v-if="activeTab === 'monitoring'"
+            :has-more="hasMoreProducts"
+            :displayed-count="displayedProducts.length"
+            :total-count="filteredProducts.length"
+            item-name="produk"
+            @load-more="loadMoreProducts"
+          />
         </div>
       </div>
 
@@ -157,31 +160,25 @@
         <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between mb-3">
           <!-- Search input -->
           <div class="w-100 px-3 py-1 search-container">
-            <div class="search-input-wrap position-relative">
-              <input 
-                type="text" 
-                v-model="historySearchQuery" 
-                class="form-control form-control-sm app-control" 
-                style="padding-left: 30px;" 
-                placeholder="Filter nama produk..." 
-              />
-              <ion-icon 
-                :icon="searchOutline" 
-                style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 1rem; color: #94a3b8;" 
-              />
-            </div>
+            <SearchInput 
+              v-model="historySearchQuery" 
+              placeholder="Filter nama produk..." 
+              size="sm" 
+            />
           </div>
         </div>
 
-        <div v-if="filteredMutations.length === 0" class="mobile-card container-padded mb-3 border-start border-4">
-          <ion-icon :icon="calendarOutline" style="font-size: 3rem;" class="mb-2" />
-          <p>Belum ada riwayat mutasi stok.</p>
-        </div>
+        <EmptyState
+          v-if="filteredMutations.length === 0"
+          :icon="calendarOutline"
+          title="Belum Ada Riwayat Mutasi"
+          message="Belum ada riwayat mutasi stok barang yang tercatat."
+        />
 
         <!-- Mutation Logs Cards -->
         <div v-else>
           <div 
-            v-for="log in filteredMutations" 
+            v-for="log in displayedMutations" 
             :key="log.id" 
             class="mobile-card container-padded mb-3"
             :class="getMutationBorderClass(log.changeQuantity)"
@@ -202,20 +199,22 @@
               Keterangan: {{ log.notes || 'Penyesuaian stok' }}
             </div>
           </div>
+
+          <LoadMoreFooter
+            v-if="activeTab === 'mutasi'"
+            :has-more="hasMoreMutations"
+            :displayed-count="displayedMutations.length"
+            :total-count="filteredMutations.length"
+            item-name="riwayat mutasi"
+            @load-more="loadMoreMutations"
+          />
         </div>
       </div>
     </ion-content>
 
     <!-- ADJUST STOCK MODAL -->
     <ion-modal ref="adjustModal" :is-open="adjustModalVisible" @didDismiss="adjustModalVisible = false">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>Penyesuaian Stok</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="adjustModalVisible = false">Batal</ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
+      <AppModalHeader title="Penyesuaian Stok" @close="adjustModalVisible = false" />
 
       <ion-content class="ion-padding bg-light" v-if="selectedProduct">
         <div class="mobile-card container-padded mb-3">
@@ -287,9 +286,9 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { ProductRepository, CategoryRepository, stockMutationsRepo } from '../../../db/repositories'
-import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonSegment, IonSegmentButton, IonLabel, IonButtons, IonBackButton, IonModal, IonBadge, toastController, onIonViewWillEnter } from '@ionic/vue';
+import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonSegment, IonSegmentButton, IonLabel, IonButtons, IonBackButton, IonModal, IonBadge, toastController, onIonViewWillEnter, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/vue';
 import { basketOutline, addOutline, removeOutline, downloadOutline, calendarOutline, documentTextOutline, searchOutline } from 'ionicons/icons';
 import { readProductImage } from '../../../composables/useProductImage';
 import * as XLSX from 'xlsx';
@@ -299,7 +298,8 @@ export default {
   name: 'StockView',
   components: {
     IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon,
-    IonSegment, IonSegmentButton, IonLabel, IonButtons, IonBackButton, IonModal, IonBadge
+    IonSegment, IonSegmentButton, IonLabel, IonButtons, IonBackButton, IonModal, IonBadge,
+    IonInfiniteScroll, IonInfiniteScrollContent
   },
   setup() {
     const activeTab = ref('monitoring')
@@ -375,6 +375,39 @@ export default {
         const prodName = getProductName(m.productId).toLowerCase()
         return prodName.includes(historySearchQuery.value.toLowerCase())
       })
+    })
+
+    // Lazy load state for monitoring products
+    const productLimit = ref(24)
+    const displayedProducts = computed(() => {
+      return filteredProducts.value.slice(0, productLimit.value)
+    })
+    const hasMoreProducts = computed(() => {
+      return displayedProducts.value.length < filteredProducts.value.length
+    })
+    const loadMoreProducts = (ev) => {
+      productLimit.value += 24
+      if (ev && ev.target) ev.target.complete()
+    }
+
+    // Lazy load state for mutations history
+    const mutationLimit = ref(25)
+    const displayedMutations = computed(() => {
+      return filteredMutations.value.slice(0, mutationLimit.value)
+    })
+    const hasMoreMutations = computed(() => {
+      return displayedMutations.value.length < filteredMutations.value.length
+    })
+    const loadMoreMutations = (ev) => {
+      mutationLimit.value += 25
+      if (ev && ev.target) ev.target.complete()
+    }
+
+    watch([searchQuery, statusFilter], () => {
+      productLimit.value = 24
+    })
+    watch(historySearchQuery, () => {
+      mutationLimit.value = 25
     })
 
     const showToast = async (msg, color = 'success') => {
@@ -497,7 +530,13 @@ export default {
       lowStockCount,
       outOfStockCount,
       filteredProducts,
+      displayedProducts,
+      hasMoreProducts,
+      loadMoreProducts,
       filteredMutations,
+      displayedMutations,
+      hasMoreMutations,
+      loadMoreMutations,
       openAdjustment,
       saveAdjustment,
       getMutationBorderClass,

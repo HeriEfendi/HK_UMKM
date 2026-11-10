@@ -19,14 +19,12 @@
     <ion-content class="app-content-wrap bg-light">
       <!-- Search Bar -->
       <div class="px-3 pt-3">
-        <div class="search-bar-wrap mb-3">
-          <input 
-            type="text" 
-            v-model="searchQuery" 
-            class="form-control app-control" 
-            placeholder="Cari nama produk..." 
-          />
-        </div>
+        <SearchInput 
+          v-model="searchQuery" 
+          placeholder="Cari nama produk..." 
+          size="sm" 
+          class="mb-3" 
+        />
 
         <!-- Category Filter Chips -->
         <div class="filter-chips--mobile mb-2">
@@ -80,15 +78,20 @@
       </div>
 
       <!-- Empty State -->
-      <div v-if="filteredProducts.length === 0" class="empty-state text-center py-5">
-        <ion-icon :icon="basketOutline" style="font-size: 3rem;" class="text-muted mb-2" />
-        <p class="text-muted">Tidak ada produk ditemukan.</p>
-      </div>
+      <EmptyState
+        v-if="filteredProducts.length === 0"
+        :icon="basketOutline"
+        title="Belum Ada Produk"
+        message="Tidak ada produk yang cocok dengan pencarian atau filter saat ini."
+        action-text="Tambah Produk"
+        action-variant="primary"
+        @action="openCreate"
+      />
 
       <!-- Product Grid -->
       <ion-grid class="mx-2">
         <ion-row>
-          <ion-col v-for="product in filteredProducts" :key="product.id" size="6" size-sm="4" size-md="3">
+          <ion-col v-for="product in displayedProducts" :key="product.id" size="6" size-sm="4" size-md="3">
             <ion-card class="mobile-card m-0 h-100 d-flex flex-column">
               <ion-card-content class="p-2 d-flex flex-column h-100">
                 <div class="position-relative text-center rounded-3 overflow-hidden mb-2" style="height: 100px; background: #f0edff;">
@@ -141,18 +144,19 @@
             </ion-card>
           </ion-col>
         </ion-row>
+
+        <LoadMoreFooter
+          :has-more="hasMoreProducts"
+          :displayed-count="displayedProducts.length"
+          :total-count="filteredProducts.length"
+          item-name="produk"
+          @load-more="loadMoreProducts"
+        />
       </ion-grid>
 
       <!-- Barcode / QR Label Modal (B-03) -->
       <ion-modal :is-open="labelModalOpen" @didDismiss="labelModalOpen = false">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Cetak Label Barcode</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="labelModalOpen = false"><ion-icon :icon="closeOutline" /></ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
+        <AppModalHeader title="Cetak Label Barcode" @close="labelModalOpen = false" />
 
         <ion-content class="ion-padding bg-light">
           <div v-if="labelProduct" class="mobile-card p-4 mx-auto text-center" style="max-width: 320px;">
@@ -215,9 +219,9 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, toRaw } from 'vue'
+import { ref, onMounted, computed, toRaw, watch } from 'vue'
 import { ProductRepository, CategoryRepository } from '../../../db/repositories'
-import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonGrid, IonRow, IonCol, IonButtons, IonBackButton, IonAlert, IonCard, IonCardContent, IonModal, toastController, onIonViewWillEnter } from '@ionic/vue';
+import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonGrid, IonRow, IonCol, IonButtons, IonBackButton, IonAlert, IonCard, IonCardContent, IonModal, toastController, onIonViewWillEnter, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/vue';
 import { addOutline, trashOutline, createOutline, basketOutline, closeOutline, copyOutline, barcodeOutline, printOutline } from 'ionicons/icons';
 import { readProductImage, saveProductImageFromBase64, deleteProductImage } from '../../../composables/useProductImage';
 import { businessProfile } from '../../../db/businessProfile';
@@ -225,7 +229,11 @@ import ProductModal from './ProductModal.vue';
 
 export default {
   name: 'ProductsListView',
-  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonGrid, IonRow, IonCol, IonButtons, IonBackButton, IonAlert, IonCard, IonCardContent, IonModal, ProductModal },
+  components: { 
+    IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, 
+    IonGrid, IonRow, IonCol, IonButtons, IonBackButton, IonAlert, IonCard, 
+    IonCardContent, IonModal, ProductModal, IonInfiniteScroll, IonInfiniteScrollContent 
+  },
   setup() {
     const products = ref([])
     const categories = ref([])
@@ -297,6 +305,23 @@ export default {
 
         return matchesSearch && matchesCategory && matchesStatus
       })
+    })
+
+    // Lazy load state for products catalog
+    const productLimit = ref(24)
+    const displayedProducts = computed(() => {
+      return filteredProducts.value.slice(0, productLimit.value)
+    })
+    const hasMoreProducts = computed(() => {
+      return displayedProducts.value.length < filteredProducts.value.length
+    })
+    const loadMoreProducts = (ev) => {
+      productLimit.value += 24
+      if (ev && ev.target) ev.target.complete()
+    }
+
+    watch([searchQuery, selectedCategory, statusFilter], () => {
+      productLimit.value = 24
     })
 
     const deleteProduct = async () => {
@@ -435,6 +460,9 @@ export default {
       selectedCategory,
       statusFilter,
       filteredProducts,
+      displayedProducts,
+      hasMoreProducts,
+      loadMoreProducts,
       deleteId,
       dialogCreate,
       dialogEdit,

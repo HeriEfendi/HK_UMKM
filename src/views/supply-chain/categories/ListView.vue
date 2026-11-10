@@ -20,32 +20,39 @@
       <!-- Summary Cards -->
       <div class="row g-2 m-2">
         <div class="col-6">
-          <div class="mobile-card p-3 h-100">
-            <small class="text-muted d-block text-xs">Total Kategori</small>
-            <div class="fs-4 fw-black text-indigo mt-1">{{ categories.length }}</div>
-            <small class="text-muted text-xs">Kelompok produk</small>
-          </div>
+          <MetricCard 
+            title="Total Kategori" 
+            :value="categories.length" 
+            subtitle="Kelompok produk" 
+            color="primary" 
+          />
         </div>
         <div class="col-6">
-          <div class="mobile-card p-3 h-100">
-            <small class="text-muted d-block text-xs">Total Nilai Inventaris</small>
-            <div class="fs-6 fw-black text-teal mt-1 text-truncate">{{ formatPrice(totalInventoryValue) }}</div>
-            <small class="text-muted text-xs">{{ totalProductCount }} variasi produk</small>
-          </div>
+          <MetricCard 
+            title="Total Nilai Inventaris" 
+            :value="formatPrice(totalInventoryValue)" 
+            :subtitle="`${totalProductCount} variasi produk`" 
+            color="success" 
+          />
         </div>
       </div>
 
       <div class="px-2 pt-1">
-        <div v-if="categories.length === 0" class="empty-state text-center py-5">
-          <ion-icon :icon="listOutline" style="font-size: 3rem;" class="text-muted mb-2" />
-          <p class="text-muted">Belum ada kategori yang dibuat.</p>
-        </div>
+        <EmptyState
+          v-if="categories.length === 0"
+          :icon="listOutline"
+          title="Belum Ada Kategori"
+          message="Belum ada kategori yang dibuat. Buat kategori baru untuk mulai mengelompokkan produk."
+          action-text="Tambah Kategori"
+          action-variant="primary"
+          @action="createCategory"
+        />
 
         <div v-else class="mobile-card p-3 mb-4">
           <h6 class="fw-bold text-dark mb-3">Daftar Kategori & Statistik Produk</h6>
           <div class="list-group list-group-flush">
             <div 
-              v-for="cat in enrichedCategories" 
+              v-for="cat in displayedCategories" 
               :key="cat.id" 
               class="list-group-item d-flex justify-content-between align-items-center py-3 px-1 border-bottom-dashed"
             >
@@ -79,6 +86,14 @@
               </div>
             </div>
           </div>
+
+          <LoadMoreFooter
+            :has-more="hasMoreCategories"
+            :displayed-count="displayedCategories.length"
+            :total-count="enrichedCategories.length"
+            item-name="kategori"
+            @load-more="loadMoreCategories"
+          />
         </div>
       </div>
 
@@ -106,7 +121,7 @@
 <script>
 import { ref, computed, onMounted } from 'vue'
 import { CategoryRepository, ProductRepository } from '../../../db/repositories'
-import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonAlert, toastController, onIonViewWillEnter } from '@ionic/vue';
+import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonAlert, toastController, onIonViewWillEnter, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/vue';
 import {
   addOutline, trashOutline, createOutline, listOutline,
   fastFoodOutline, cafeOutline, shirtOutline, colorPaletteOutline,
@@ -116,7 +131,10 @@ import CategoryModal from './CategoryModal.vue'
 
 export default {
   name: 'CategoriesListView',
-  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonAlert, CategoryModal },
+  components: { 
+    IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, 
+    IonButtons, IonAlert, CategoryModal, IonInfiniteScroll, IonInfiniteScrollContent 
+  },
   setup() {
     const categories = ref([])
     const products = ref([])
@@ -146,6 +164,18 @@ export default {
         }
       })
     })
+
+    const categoryLimit = ref(25)
+    const displayedCategories = computed(() => {
+      return enrichedCategories.value.slice(0, categoryLimit.value)
+    })
+    const hasMoreCategories = computed(() => {
+      return displayedCategories.value.length < enrichedCategories.value.length
+    })
+    const loadMoreCategories = (ev) => {
+      categoryLimit.value += 25
+      if (ev && ev.target) ev.target.complete()
+    }
 
     const totalProductCount = computed(() => products.value.length)
     const totalInventoryValue = computed(() => {
@@ -198,7 +228,7 @@ export default {
     onIonViewWillEnter(fetch)
 
     return {
-      categories, products, enrichedCategories, totalProductCount, totalInventoryValue,
+      categories, products, enrichedCategories, displayedCategories, hasMoreCategories, loadMoreCategories, totalProductCount, totalInventoryValue,
       deleteId, editCategory, createCategory, confirmDelete, remove,
       addOutline, trashOutline, createOutline, listOutline,
       modalVisible, selectedCategoryId, fetch, formatPrice, getCatIcon
