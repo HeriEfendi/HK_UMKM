@@ -134,7 +134,7 @@
           </div>
 
           <!-- Transaction Items -->
-          <div v-for="tx in filteredTransactions" :key="tx.id" class="mobile-card p-3 mx-3 mb-3 border-start border-4" :class="tx.type === 'DEPOSIT' ? 'border-success' : 'border-danger'">
+          <div v-for="tx in displayedTransactions" :key="tx.id" class="mobile-card p-3 mx-3 mb-3 border-start border-4" :class="tx.type === 'DEPOSIT' ? 'border-success' : 'border-danger'">
             <div class="d-flex justify-content-between align-items-center">
               <div>
                 <div class="d-flex align-items-center gap-2">
@@ -157,9 +157,21 @@
             </div>
           </div>
 
-          <div v-if="filteredTransactions.length === 0" class="text-center py-5 text-muted mobile-card p-4">
-            <p>Tidak ada riwayat mutasi transaksi ditemukan.</p>
-          </div>
+          <LoadMoreFooter
+            v-if="activeTab === 'mutasi'"
+            :has-more="hasMoreTransactions"
+            :displayed-count="displayedTransactions.length"
+            :total-count="filteredTransactions.length"
+            item-name="mutasi transaksi"
+            @load-more="loadMoreTransactions"
+          />
+
+          <EmptyState
+            v-if="filteredTransactions.length === 0"
+            :icon="walletOutline"
+            title="Tidak Ada Mutasi"
+            message="Tidak ada riwayat mutasi transaksi ditemukan dengan filter saat ini."
+          />
         </div>
 
         <!-- ==================== TAB 3: ANALYTICS & REPORTS ==================== -->
@@ -341,7 +353,8 @@ import { migrateOldSavings } from '../../../db/savingsMigration'
 import { onIonViewWillEnter } from '@ionic/vue'
 import {
   IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons,
-  IonSegment, IonSegmentButton, IonLabel, IonSpinner, IonModal
+  IonSegment, IonSegmentButton, IonLabel, IonSpinner, IonModal,
+  IonInfiniteScroll, IonInfiniteScrollContent
 } from '@ionic/vue';
 import {
   addOutline, trashOutline, pencilOutline, swapHorizontalOutline, arrowUpOutline,
@@ -353,7 +366,8 @@ export default {
   name: 'AccountingSavingsListView',
   components: {
     IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons,
-    IonSegment, IonSegmentButton, IonLabel, IonSpinner, IonModal
+    IonSegment, IonSegmentButton, IonLabel, IonSpinner, IonModal,
+    IonInfiniteScroll, IonInfiniteScrollContent
   },
   setup() {
     // State UI
@@ -489,6 +503,23 @@ export default {
       }
       // Sort newest date first
       return filtered.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
+    })
+
+    // Lazy load state for savings transactions
+    const txLimit = ref(25)
+    const displayedTransactions = computed(() => {
+      return filteredTransactions.value.slice(0, txLimit.value)
+    })
+    const hasMoreTransactions = computed(() => {
+      return displayedTransactions.value.length < filteredTransactions.value.length
+    })
+    const loadMoreTransactions = (ev) => {
+      txLimit.value += 25
+      if (ev && ev.target) ev.target.complete()
+    }
+
+    watch([filterSearch, filterAccount, filterType], () => {
+      txLimit.value = 25
     })
 
     const getAccountName = (accountId) => {
@@ -761,7 +792,8 @@ export default {
       accounts, transactions, editingAccount, accountForm, txForm, transferForm,
       filterSearch, filterAccount, filterType, formatPrice, formatDate,
       accountsWithBalance, totalNetWorth, lastUpdatedDate, activeCategories,
-      filteredTransactions, getAccountName, openAccountModal, saveAccount,
+      filteredTransactions,
+      displayedTransactions, hasMoreTransactions, loadMoreTransactions, getAccountName, openAccountModal, saveAccount,
       onDeleteAccount, openTxModal, saveTransaction, onDeleteTransaction,
       openTransferModal, availableDestinationAccounts, saveTransfer,
       stats, trendChartOption, hasTrendData, distributionChartOption, hasDistributionData,

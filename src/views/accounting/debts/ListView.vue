@@ -252,11 +252,10 @@
           <div class="mobile-card p-3 mb-3 mx-3 shadow-sm">
             <div class="row g-2 align-items-center">
               <div class="col-12 col-md-5">
-                <input 
-                  type="text" 
+                <SearchInput 
                   v-model="searchQuery" 
-                  class="form-control app-control" 
                   placeholder="Cari nama pemberi utang / catatan..." 
+                  size="sm" 
                 />
               </div>
 
@@ -283,7 +282,7 @@
 
           <!-- Debt Items List -->
           <div v-if="filteredDebts.length > 0" class="row mx-2">
-            <div v-for="debt in filteredDebts" :key="debt.id" class="col-12 col-sm-6 col-lg-4 g-2 m-0 mb-3 px-2">
+            <div v-for="debt in displayedDebts" :key="debt.id" class="col-12 col-sm-6 col-lg-4 g-2 m-0 mb-3 px-2">
               <div 
                 class="mobile-card-sm h-100 p-3 d-flex flex-column justify-content-between border-start border-4 shadow-sm"
                 :class="getCardBorderClass(debt)"
@@ -403,19 +402,27 @@
                 </div>
               </div>
             </div>
+
+            <LoadMoreFooter
+              v-if="activeTab === 'riwayat'"
+              :has-more="hasMoreDebts"
+              :displayed-count="displayedDebts.length"
+              :total-count="filteredDebts.length"
+              item-name="data utang"
+              @load-more="loadMoreDebts"
+            />
           </div>
 
           <!-- Empty State -->
-          <div v-else class="text-center py-5 text-muted mobile-card p-4 mx-3 shadow-sm">
-            <ion-icon :icon="walletOutline" style="font-size: 3.5rem; color: #cbd5e1;" />
-            <h6 class="fw-bold mt-3 text-secondary">Tidak Ada Data Utang</h6>
-            <p class="text-sm">
-              {{ searchQuery ? 'Tidak ada data utang yang cocok dengan filter atau kata kunci.' : 'Klik "Tambah Utang" untuk mencatat kewajiban utang baru.' }}
-            </p>
-            <button class="btn btn-action primary btn-sm mt-2" @click="openModal()">
-              <ion-icon :icon="addOutline" class="me-1" /> Tambah Utang Pertama
-            </button>
-          </div>
+          <EmptyState
+            v-else
+            :icon="walletOutline"
+            title="Tidak Ada Data Utang"
+            :message="searchQuery ? 'Tidak ada data utang yang cocok dengan filter atau kata kunci.' : 'Klik tombol di bawah untuk mencatat kewajiban utang baru.'"
+            action-text="Tambah Utang"
+            action-variant="primary"
+            @action="openModal()"
+          />
         </div>
 
         <!-- ==================== TAB 3: ANALISA & GRAFIK ==================== -->
@@ -499,7 +506,7 @@ import {
   IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, 
   IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, 
   IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonSpinner, 
-  alertController 
+  alertController, IonInfiniteScroll, IonInfiniteScrollContent
 } from '@ionic/vue'
 import { 
   addOutline, trashOutline, createOutline, pencilOutline, 
@@ -518,7 +525,8 @@ export default {
     IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, 
     IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, 
     IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonSpinner, 
-    DebtModal, DebtPaymentModal
+    DebtModal, DebtPaymentModal,
+    IonInfiniteScroll, IonInfiniteScrollContent
   },
   setup() {
     const activeTab = ref('dashboard')
@@ -835,6 +843,23 @@ export default {
       })
     })
 
+    // Lazy load state for debts list
+    const debtLimit = ref(20)
+    const displayedDebts = computed(() => {
+      return filteredDebts.value.slice(0, debtLimit.value)
+    })
+    const hasMoreDebts = computed(() => {
+      return displayedDebts.value.length < filteredDebts.value.length
+    })
+    const loadMoreDebts = (ev) => {
+      debtLimit.value += 20
+      if (ev && ev.target) ev.target.complete()
+    }
+
+    watch([searchQuery, statusFilter, typeFilter, sortBy], () => {
+      debtLimit.value = 20
+    })
+
     // Chart 1: Top 5 Highest Remaining Debts (Bar)
     const topDebtsChartSeries = computed(() => {
       const top5 = [...debts.value]
@@ -1006,6 +1031,7 @@ export default {
       activeTab, loading, debts, isModalOpen, selectedDebtId,
       isPaymentModalOpen, selectedDebtForPayment,
       searchQuery, statusFilter, typeFilter, sortBy, filteredDebts,
+      displayedDebts, hasMoreDebts, loadMoreDebts,
       summary, overdueDebtsCount, paidPercentage, scheduledDebts,
       topDebtsChartOption, hasTopDebtsData,
       statusDonutOption, hasStatusDonutData,

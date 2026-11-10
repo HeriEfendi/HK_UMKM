@@ -178,7 +178,11 @@
         <div class="mobile-card p-3 mb-3 mx-3">
           <div class="row g-2">
             <div class="col-12 col-md-4">
-              <input type="text" v-model="filterSearch" class="form-control form-control-sm app-control" placeholder="Cari keperluan pengeluaran..." />
+              <SearchInput 
+                v-model="filterSearch" 
+                placeholder="Cari keperluan pengeluaran..." 
+                size="sm" 
+              />
             </div>
             <div class="col-6 col-md-4">
               <select v-model="filterCategory" class="form-control form-control-sm app-control">
@@ -198,7 +202,7 @@
 
         <!-- Expenses List Grid -->
         <div v-if="filteredExpenses.length" class="row mx-2 mb-2">
-          <div v-for="expense in filteredExpenses" :key="expense.id" class="col-12 col-sm-6 col-lg-4 g-2 m-0 mb-1 px-2">
+          <div v-for="expense in displayedExpenses" :key="expense.id" class="col-12 col-sm-6 col-lg-4 g-2 m-0 mb-1 px-2">
             <div class="mobile-card-sm h-100 d-flex align-items-center justify-content-between p-2">
               <div class="d-flex flex-column" style="flex: 1; min-width: 0;">
                 <div class="d-flex align-items-center gap-1 mb-1 flex-wrap">
@@ -231,25 +235,28 @@
               </div>
             </div>
           </div>
+
+          <LoadMoreFooter
+            v-if="activeTab === 'riwayat'"
+            :has-more="hasMoreExpenses"
+            :displayed-count="displayedExpenses.length"
+            :total-count="filteredExpenses.length"
+            item-name="pengeluaran"
+            @load-more="loadMoreExpenses"
+          />
         </div>
         
-        <div v-else class="text-center py-5 text-muted mobile-card p-4">
-          <p>Tidak ada pengeluaran ditemukan dengan filter saat ini.</p>
-        </div>
+        <EmptyState
+          v-else
+          :icon="receiptOutline"
+          title="Tidak Ada Pengeluaran"
+          message="Tidak ada catatan pengeluaran yang cocok dengan filter atau kata kunci saat ini."
+        />
       </div>
 
       <!-- Quick Receipt Preview Modal -->
       <ion-modal :is-open="showReceiptModal" @didDismiss="closeReceiptModal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Lampiran Nota</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeReceiptModal">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
+        <AppModalHeader title="Lampiran Nota" @close="closeReceiptModal" />
         <ion-content class="ion-padding text-center">
           <div v-if="selectedReceipt" class="d-flex flex-column align-items-center justify-content-center h-100">
             <div class="mb-3 text-start w-100 p-2 bg-light rounded border">
@@ -273,8 +280,8 @@
 
 <script>
 import { ref, computed, defineAsyncComponent, watch, nextTick } from 'vue'
-import { onIonViewWillEnter, IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonModal, alertController } from '@ionic/vue';
-import { addOutline, trashOutline, pencilOutline, createOutline, documentAttachOutline, closeOutline } from 'ionicons/icons';
+import { onIonViewWillEnter, IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonModal, alertController, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/vue';
+import { addOutline, trashOutline, pencilOutline, createOutline, documentAttachOutline, closeOutline, receiptOutline } from 'ionicons/icons';
 import { expensesRepo, savingAccountsRepo, savingTransactionsRepo, expenseAttachmentsRepo } from '../../../db/repositories'
 import { db } from '../../../db/schema'
 import { useRouter } from 'vue-router'
@@ -282,7 +289,11 @@ import { CHART_PALETTE, formatIDR, formatCompactNumber, getModernTooltip, getDon
 
 export default {
   name: 'AccountingExpensesListView',
-  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonModal },
+  components: { 
+    IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, 
+    IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonModal,
+    IonInfiniteScroll, IonInfiniteScrollContent 
+  },
   setup() {
     const router = useRouter()
     const activeTab = ref('dashboard')
@@ -490,6 +501,23 @@ export default {
 
       // Sort newest first
       return result.sort((a, b) => new Date(b.date) - new Date(a.date))
+    })
+
+    // Lazy load state for expenses list
+    const expenseLimit = ref(25)
+    const displayedExpenses = computed(() => {
+      return filteredExpenses.value.slice(0, expenseLimit.value)
+    })
+    const hasMoreExpenses = computed(() => {
+      return displayedExpenses.value.length < filteredExpenses.value.length
+    })
+    const loadMoreExpenses = (ev) => {
+      expenseLimit.value += 25
+      if (ev && ev.target) ev.target.complete()
+    }
+
+    watch([filterSearch, filterCategory, filterAccount], () => {
+      expenseLimit.value = 25
     })
 
      // Donut Chart logic: dynamic months
@@ -712,9 +740,10 @@ export default {
       editingBudget, budgetDraft, startEditBudget, saveBudget, budgetCategoriesDraft,
       donutChartOption, hasDonutData, accounts, getAccountName, filterSearch,
       filterCategory, filterAccount, allCategories, filteredExpenses,
+      displayedExpenses, hasMoreExpenses, loadMoreExpenses,
       dailyChartOption, hasDailyData, monthlyChartOption, hasMonthlyData,
       categoryPeriodMonths, selectedReceipt, showReceiptModal, viewReceipt,
-      closeReceiptModal, formatFileSize, documentAttachOutline, closeOutline
+      closeReceiptModal, formatFileSize, documentAttachOutline, closeOutline, receiptOutline
     }
   }
 }

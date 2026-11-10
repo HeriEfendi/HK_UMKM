@@ -101,7 +101,11 @@
         <div class="mobile-card p-3 mb-3 mx-3">
           <div class="row g-2">
             <div class="col-12 col-md-6">
-              <input type="text" v-model="filterSearch" class="form-control form-control-sm app-control" placeholder="Cari pendapatan..." />
+              <SearchInput 
+                v-model="filterSearch" 
+                placeholder="Cari pendapatan..." 
+                size="sm" 
+              />
             </div>
             <div class="col-12 col-md-6">
               <select v-model="filterCategory" class="form-control form-control-sm app-control">
@@ -113,7 +117,7 @@
         </div>
 
         <div v-if="filteredIncomes.length" class="row mx-2 mb-2">
-          <div v-for="income in filteredIncomes" :key="income.id" class="col-12 col-sm-6 col-lg-4 g-2 m-0 mb-1 px-2">
+          <div v-for="income in displayedIncomes" :key="income.id" class="col-12 col-sm-6 col-lg-4 g-2 m-0 mb-1 px-2">
             <div class="mobile-card-sm h-100 d-flex align-items-center justify-content-between p-2">
               <div class="d-flex flex-column" style="flex: 1; min-width: 0;">
                 <h6 class="fw-bold text-dark mb-0 text-truncate medium w-100">{{ income.description || income.name || '-' }}</h6>
@@ -133,10 +137,23 @@
               </div>
             </div>
           </div>
+
+          <LoadMoreFooter
+            v-if="activeTab === 'riwayat'"
+            :has-more="hasMoreIncomes"
+            :displayed-count="displayedIncomes.length"
+            :total-count="filteredIncomes.length"
+            item-name="pendapatan"
+            @load-more="loadMoreIncomes"
+          />
         </div>
-        <div v-else class="text-center py-5 text-muted mobile-card p-4">
-          <p>Tidak ada pendapatan ditemukan.</p>
-        </div>
+        
+        <EmptyState
+          v-else
+          :icon="walletOutline"
+          title="Tidak Ada Pendapatan"
+          message="Tidak ada catatan pendapatan yang cocok dengan filter saat ini."
+        />
       </div>
 
       <!-- LABA RUGI TAB -->
@@ -261,15 +278,19 @@
 
 <script>
 import { ref, computed, defineAsyncComponent, watch, nextTick } from 'vue'
-import { onIonViewWillEnter, IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, alertController } from '@ionic/vue';
-import { addOutline, trashOutline, createOutline } from 'ionicons/icons';
+import { onIonViewWillEnter, IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, alertController, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/vue';
+import { addOutline, trashOutline, createOutline, walletOutline } from 'ionicons/icons';
 import { incomesRepo, salesRepo, expensesRepo } from '../../../db/repositories'
 import IncomeModal from './IncomeModal.vue'
 import { CHART_PALETTE, formatIDR, formatCompactNumber, getModernTooltip, getDonutTooltip, createAreaGradient } from '../../../utils/chartThemes'
 
 export default {
   name: 'AccountingIncomesListView',
-  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IncomeModal },
+  components: { 
+    IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonButtons, 
+    IonSegment, IonSegmentButton, IonLabel, IonGrid, IonRow, IonCol, IonCard, IonCardContent, 
+    IncomeModal, IonInfiniteScroll, IonInfiniteScrollContent 
+  },
   setup() {
     const activeTab = ref('dashboard')
     const incomes = ref([])
@@ -356,6 +377,23 @@ export default {
         result = result.filter(e => (e.category || 'Umum') === filterCategory.value)
       }
       return result.sort((a, b) => new Date(b.date) - new Date(a.date))
+    })
+
+    // Lazy load state for incomes list
+    const incomeLimit = ref(25)
+    const displayedIncomes = computed(() => {
+      return filteredIncomes.value.slice(0, incomeLimit.value)
+    })
+    const hasMoreIncomes = computed(() => {
+      return displayedIncomes.value.length < filteredIncomes.value.length
+    })
+    const loadMoreIncomes = (ev) => {
+      incomeLimit.value += 25
+      if (ev && ev.target) ev.target.complete()
+    }
+
+    watch([filterSearch, filterCategory], () => {
+      incomeLimit.value = 25
     })
 
     // Weekly trend
@@ -583,8 +621,9 @@ export default {
       activeTab, incomes, sales, expenses, onDelete, formatPrice, formatDate,
       addOutline, trashOutline, createOutline, summary, openModal, isModalOpen,
       selectedIncomeId, fetchAll, filterSearch, filterCategory, allCategories,
-      filteredIncomes, monthlyChartOption, hasMonthlyData, donutChartOption,
-      hasDonutData, weeklyChartOption, hasWeeklyData, plPeriod, plData
+      filteredIncomes,
+      displayedIncomes, hasMoreIncomes, loadMoreIncomes, monthlyChartOption, hasMonthlyData, donutChartOption,
+      hasDonutData, weeklyChartOption, hasWeeklyData, plPeriod, plData, walletOutline
     }
   }
 }
