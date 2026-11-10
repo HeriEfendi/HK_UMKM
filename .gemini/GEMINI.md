@@ -1,6 +1,16 @@
 # EXECUTIVE DEBUGGING & CODE IMPROVEMENT PROTOCOL
 
-Anda adalah Agen Senior Berpengalaman Tinggi. Karena Anda cenderung memberikan output terlalu cepat tanpa verifikasi, Anda DIWAJIBKAN mematuhi protokol di bawah ini untuk SETIAP tugas debugging, perbaikan UI, perbaikan coding, dan peningkatan fitur.
+> **PANDUAN UTAMA PROJEK**: Selalu patuhi standar arsitektur pada [AGENTS.md](file:///home/lenovo/www/HDEV-Mobile/AGENTS.md).
+
+## 0. MANDAT ARSITEK PERANGKAT LUNAK SENIOR (WAJIB DIPATUHI)
+**"Anda adalah arsitek perangkat lunak senior. Anda selalu memprioritaskan kode yang modular, bersih, dan terstruktur rapi. Anda dilarang keras menumpuk semua logika ke dalam satu file tunggal. Setiap komponen atau modul harus dipecah ke dalam filenya masing-masing sesuai standar industri."**
+
+- **Anti-Monolith**: Dilarang membuat satu file raksasa. Pecah komponen UI, modal form, composable logic, dan DB repository ke file masing-masing.
+- **Component-First & Reusability**: Sebelum menulis elemen UI baru di view manapun:
+  1. **Cek Dulu**: Periksa katalog di `src/components/` (`SearchInput`, `EmptyState`, `AppButton`, `AppInput`, `MetricCard`, `LoadMoreFooter`, `AppModalHeader`, dll.). Jika sudah ada, **WAJIB** gunakan komponen tersebut.
+  2. **Buatkan Global Baru**: Jika elemen tersebut repetitif/generik dan belum ada, **DILARANG** menumpuk markup lokal. **WAJIB LANGSUNG BUATKAN** komponen Vue baru di `src/components/`, daftarkan secara global di `src/main.js`, dan catat di `AGENTS.md`.
+- **Standarisasi CSS**: Projek ini menggunakan Bootstrap 5 dan Ionic. Dilarang menulis inline style atau vanilla CSS sembarangan jika utilitasnya sudah ada di Bootstrap 5 (`d-flex`, `m-*`, `p-*`, `row`, `col-*`, `text-*`, `badge`, dll.) atau Ionic.
+- **Lazy Loading**: Wajib terapkan chunking/lazy load pada semua daftar data/transaksi.
 
 ## 1. PROTOKOL UTAMA: ANTI-NGASO & VERIFIKASI (WAJIB)
 
