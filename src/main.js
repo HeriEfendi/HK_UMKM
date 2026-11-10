@@ -11,6 +11,14 @@ import router from './router'
 import store from './store'
 import { seedDatabase } from './db/schema'
 import NumberInput from './components/NumberInput.vue'
+import SearchInput from './components/SearchInput.vue'
+import EmptyState from './components/EmptyState.vue'
+import AppButton from './components/AppButton.vue'
+import AppInput from './components/AppInput.vue'
+import AppModalHeader from './components/AppModalHeader.vue'
+import LoadMoreFooter from './components/LoadMoreFooter.vue'
+import MetricCard from './components/MetricCard.vue'
+import AppToast from './components/AppToast.vue'
 import { VChart } from './plugins/echarts'
 
 
@@ -42,6 +50,14 @@ async function initializeApp() {
   app.use(store);
   app.use(router);
   app.component('NumberInput', NumberInput);
+  app.component('SearchInput', SearchInput);
+  app.component('EmptyState', EmptyState);
+  app.component('AppButton', AppButton);
+  app.component('AppInput', AppInput);
+  app.component('AppModalHeader', AppModalHeader);
+  app.component('LoadMoreFooter', LoadMoreFooter);
+  app.component('MetricCard', MetricCard);
+  app.component('AppToast', AppToast);
   app.component('v-chart', VChart);
   app.component('VChart', VChart);
 
