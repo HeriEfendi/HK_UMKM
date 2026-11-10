@@ -201,14 +201,16 @@
         </div>
 
         <!-- History List -->
-        <div v-if="logs.length === 0" class="text-center py-5 text-muted mobile-card container-padded">
-          <ion-icon :icon="calendarOutline" style="font-size: 3rem;" class="mb-2 text-muted" />
-          <p>Belum ada riwayat presensi kerja.</p>
-        </div>
+        <EmptyState
+          v-if="logs.length === 0"
+          :icon="calendarOutline"
+          title="Belum Ada Riwayat"
+          message="Belum ada riwayat presensi kerja yang tercatat."
+        />
 
         <div v-else>
           <div 
-            v-for="log in logs" 
+            v-for="log in displayedLogs" 
             :key="log.id" 
             class="mobile-card container-padded mb-3 border-start border-4"
             :class="log.clockOut ? 'border-teal' : 'border-warning'"
@@ -261,20 +263,22 @@
               "{{ log.notes }}"
             </div>
           </div>
+
+          <LoadMoreFooter
+            v-if="activeTab === 'riwayat'"
+            :has-more="hasMoreLogs"
+            :displayed-count="displayedLogs.length"
+            :total-count="logs.length"
+            item-name="riwayat presensi"
+            @load-more="loadMoreLogs"
+          />
         </div>
       </div>
     </ion-content>
 
     <!-- SETTINGS MODAL -->
     <ion-modal ref="settingsModal" :is-open="settingsModalVisible" @didDismiss="settingsModalVisible = false">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>Pengaturan Presensi</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="settingsModalVisible = false">Batal</ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
+      <AppModalHeader title="Pengaturan Presensi" @close="settingsModalVisible = false" />
 
       <ion-content class="ion-padding bg-light">
         <div class="mobile-card p-3 mb-4">
@@ -508,7 +512,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton, IonTitle, IonButton,
   IonContent, IonSegment, IonSegmentButton, IonLabel, IonIcon, IonBadge, 
   IonModal, IonAlert, IonFooter, IonGrid, IonRow, IonCol, IonCard, IonCardContent,
-  toastController
+  toastController, IonInfiniteScroll, IonInfiniteScrollContent
 } from '@ionic/vue';
 import { 
   settingsOutline, playOutline, stopOutline, cafeOutline, calendarOutline, 
@@ -524,12 +528,24 @@ export default {
   components: {
     IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton, IonTitle, IonButton,
     IonContent, IonSegment, IonSegmentButton, IonLabel, IonIcon, IonBadge, 
-    IonModal, IonAlert, IonFooter, IonGrid, IonRow, IonCol, IonCard, IonCardContent
+    IonModal, IonAlert, IonFooter, IonGrid, IonRow, IonCol, IonCard, IonCardContent,
+    IonInfiniteScroll, IonInfiniteScrollContent
   },
   setup() {
     // Nav & States
     const activeTab = ref('presensi');
     const logs = ref([]);
+    const logLimit = ref(25);
+    const displayedLogs = computed(() => {
+      return logs.value.slice(0, logLimit.value);
+    });
+    const hasMoreLogs = computed(() => {
+      return displayedLogs.value.length < logs.value.length;
+    });
+    const loadMoreLogs = (ev) => {
+      logLimit.value += 25;
+      if (ev && ev.target) ev.target.complete();
+    };
     const activeLog = ref(null);
     const activeBreak = ref(null);
 
@@ -1446,6 +1462,9 @@ export default {
     return {
       activeTab,
       logs,
+      displayedLogs,
+      hasMoreLogs,
+      loadMoreLogs,
       activeLog,
       activeBreak,
       currentTimeStr,

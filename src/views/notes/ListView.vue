@@ -31,22 +31,11 @@
       <div class="px-3 pt-2 pb-1">
         <div class="row g-2 align-items-center">
           <div class="col-12 col-md-6">
-            <div class="position-relative">
-              <input 
-                type="text" 
-                v-model="searchQuery" 
-                class="form-control form-control-sm app-control search-input" 
-                placeholder="Cari di catatan..." 
-              />
-              <ion-icon :icon="searchOutline" class="search-icon" />
-              <button 
-                v-if="searchQuery" 
-                class="btn-clear-search" 
-                @click="searchQuery = ''"
-              >
-                <ion-icon :icon="closeCircleOutline" />
-              </button>
-            </div>
+            <SearchInput 
+              v-model="searchQuery" 
+              placeholder="Cari di catatan..." 
+              size="sm" 
+            />
           </div>
 
           <div class="col-12 col-md-6">
@@ -126,18 +115,15 @@
       </div>
 
       <!-- Empty State -->
-      <div v-if="filteredNotes.length === 0" class="empty-state text-center py-5 mobile-card container-padded mx-3">
-        <div class="empty-icon-wrap mb-3">
-          <ion-icon :icon="journalOutline" style="font-size:3.5rem;color:#cbd5e1;" />
-        </div>
-        <h5 class="fw-bold text-secondary">Belum ada catatan</h5>
-        <p class="text-muted text-sm">
-          {{ searchQuery ? 'Tidak ada catatan yang cocok dengan pencarian.' : 'Klik "Catatan Baru" atau ketik di atas untuk membuat catatan baru.' }}
-        </p>
-        <button class="btn btn-action primary btn-md mt-2" @click="openCreateModal('text')">
-          <ion-icon :icon="addOutline" class="me-1" /> Buat Catatan Pertama
-        </button>
-      </div>
+      <EmptyState
+        v-if="filteredNotes.length === 0"
+        :icon="journalOutline"
+        title="Belum Ada Catatan"
+        :message="searchQuery ? 'Tidak ada catatan yang cocok dengan pencarian.' : 'Klik tombol di bawah untuk membuat catatan baru.'"
+        action-text="Buat Catatan Baru"
+        action-variant="primary"
+        @action="openCreateModal('text')"
+      />
 
       <div v-else class="notes-content-wrapper px-3 pb-5">
         <!-- ── PINNED SECTION ───────────────────────────────────────── -->
@@ -229,7 +215,7 @@
           </div>
           <div :class="isGridView ? 'notes-grid' : 'notes-list'">
             <div 
-              v-for="note in (activeFilter === 'all' && pinnedNotesList.length > 0 ? otherNotesList : filteredNotes)" 
+              v-for="note in displayedNotes" 
               :key="note.id" 
               class="note-card"
               :class="['color-' + (note.color || 'default'), { 'is-checklist': note.type === 'checklist' }]"
@@ -306,20 +292,21 @@
               </div>
             </div>
           </div>
+
+          <LoadMoreFooter
+            :has-more="hasMoreNotes"
+            :displayed-count="displayedNotes.length"
+            :total-count="primaryNotesList.length"
+            item-name="catatan"
+            @load-more="loadMoreNotes"
+          />
         </div>
       </div>
     </ion-content>
 
     <!-- MANAGE LABELS MODAL -->
     <ion-modal :is-open="manageLabelsVisible" @didDismiss="manageLabelsVisible = false">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>Kelola Label</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="manageLabelsVisible = false"><ion-icon :icon="closeOutline" /></ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
+      <AppModalHeader title="Kelola Label" @close="manageLabelsVisible = false" />
 
       <ion-content class="ion-padding bg-light">
         <div class="mobile-card p-3 my-2">
@@ -376,10 +363,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
   IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
-  IonIcon, IonModal
+  IonIcon, IonModal, IonInfiniteScroll, IonInfiniteScrollContent
 } from '@ionic/vue'
 import {
   journalOutline, gridOutline, listOutline, addOutline, searchOutline, closeCircleOutline,
@@ -443,6 +430,26 @@ const filteredNotes = computed(() => {
 
 const pinnedNotesList = computed(() => filteredNotes.value.filter(n => n.isPinned))
 const otherNotesList = computed(() => filteredNotes.value.filter(n => !n.isPinned))
+
+const notesLimit = ref(24)
+const primaryNotesList = computed(() => {
+  return activeFilter.value === 'all' && pinnedNotesList.value.length > 0
+    ? otherNotesList.value
+    : filteredNotes.value
+})
+const displayedNotes = computed(() => {
+  return primaryNotesList.value.slice(0, notesLimit.value)
+})
+const hasMoreNotes = computed(() => {
+  return displayedNotes.value.length < primaryNotesList.value.length
+})
+const loadMoreNotes = (ev?: any) => {
+  notesLimit.value += 24
+  if (ev && ev.target) ev.target.complete()
+}
+watch([searchQuery, activeFilter], () => {
+  notesLimit.value = 24
+})
 
 function getCssFont(fontId?: string) {
   const item = FONT_FAMILIES.find(f => f.id === fontId)

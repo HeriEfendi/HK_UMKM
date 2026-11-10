@@ -114,19 +114,11 @@
         <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between mt-2">
           <!-- Search input -->
           <div class="w-100 px-3 py-1 search-container">
-            <div class="search-input-wrap position-relative">
-              <input
-                type="text"
-                v-model="searchQuery"
-                class="form-control form-control-sm app-control"
-                style="padding-left: 30px;"
-                placeholder="Cari task, target, atau status..."
-              />
-              <ion-icon
-                :icon="searchOutline"
-                style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 1rem; color: #94a3b8;"
-              />
-            </div>
+            <SearchInput 
+              v-model="searchQuery" 
+              placeholder="Cari task, target, atau status..." 
+              size="sm" 
+            />
           </div>
 
           <!-- Filter chips -->
@@ -147,15 +139,20 @@
           </div>
         </div>
         <!-- Empty State -->
-        <div v-if="filteredTasks.length === 0" class="empty-state text-center py-5 mobile-card container-padded mx-3 mt-3">
-          <ion-icon :icon="calendarOutline" style="font-size: 3rem;" class="mb-2 text-muted" />
-          <p class="text-muted">Tidak ada task sesuai filter.</p>
-        </div>
+        <EmptyState
+          v-if="filteredTasks.length === 0"
+          :icon="calendarOutline"
+          title="Belum Ada Task"
+          message="Tidak ada task yang sesuai dengan filter saat ini."
+          action-text="Tambah Task"
+          action-variant="primary"
+          @action="openDialog()"
+        />
 
         <!-- Task Grid (Matching Buku Kas Index.vue Equal Height) -->
         <ion-grid v-else class="mx-2">
           <ion-row>
-            <ion-col v-for="task in filteredTasks" :key="task.id" size="12" size-sm="6" size-lg="4">
+            <ion-col v-for="task in displayedTasks" :key="task.id" size="12" size-sm="6" size-lg="4">
               <ion-card class="mobile-card m-0 mb-3 h-100 d-flex flex-column">
                 <ion-card-header class="mobile-card-header">
                   <div class="mobile-card-top">
@@ -201,20 +198,22 @@
               </ion-card>
             </ion-col>
           </ion-row>
+
+          <LoadMoreFooter
+            v-if="activeTab === 'tasks'"
+            :has-more="hasMoreTasks"
+            :displayed-count="displayedTasks.length"
+            :total-count="filteredTasks.length"
+            item-name="tugas"
+            @load-more="loadMoreTasks"
+          />
         </ion-grid>
       </div>
     </ion-content>
 
     <!-- FORM MODAL -->
     <ion-modal :is-open="dialogVisible" @didDismiss="closeDialog">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>{{ editMode ? 'Edit Todo Pribadi' : 'Tambah Todo Pribadi' }}</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="closeDialog"><ion-icon :icon="closeOutline" /></ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
+      <AppModalHeader :title="editMode ? 'Edit Todo Pribadi' : 'Tambah Todo Pribadi'" @close="closeDialog" />
       <ion-content class="ion-padding modal-content">
         <div class="form-container mb-4">
           <div class="form-section">
@@ -309,7 +308,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, defineAsyncComponent, watch, nextTick } from 'vue'
-import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonCardSubtitle, IonModal, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonAlert, IonFooter, IonGrid, IonRow, IonCol, IonBadge, onIonViewWillEnter } from '@ionic/vue';
+import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonCardSubtitle, IonModal, IonButtons, IonSegment, IonSegmentButton, IonLabel, IonAlert, IonFooter, IonGrid, IonRow, IonCol, IonBadge, onIonViewWillEnter, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/vue';
 import { addOutline, trashOutline, closeOutline, searchOutline, calendarOutline, pencilOutline, ellipseOutline, timeOutline, checkmarkCircle } from 'ionicons/icons';
 import { TodoRepository } from '@/db/todoRepository'
 import AppToast from '@/components/AppToast.vue';
@@ -475,6 +474,21 @@ const filteredTasks = computed(() => {
     if (b.due_date) return 1
     return 0
   })
+})
+
+const taskLimit = ref(24)
+const displayedTasks = computed(() => {
+  return filteredTasks.value.slice(0, taskLimit.value)
+})
+const hasMoreTasks = computed(() => {
+  return displayedTasks.value.length < filteredTasks.value.length
+})
+const loadMoreTasks = (ev?: any) => {
+  taskLimit.value += 24
+  if (ev && ev.target) ev.target.complete()
+}
+watch([searchQuery, filterStatus], () => {
+  taskLimit.value = 24
 })
 
 const statusFilterOptions = [

@@ -24,10 +24,11 @@
       <!-- Search + filter -->
       <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between mt-1">
         <div class="w-100 px-3 py-1">
-          <div class="position-relative">
-            <input type="text" v-model="searchQuery" class="form-control form-control-sm app-control" style="padding-left:30px;" placeholder="Cari pengingat..." />
-            <ion-icon :icon="searchOutline" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:1rem;color:#94a3b8;" />
-          </div>
+          <SearchInput 
+            v-model="searchQuery" 
+            placeholder="Cari pengingat..." 
+            size="sm" 
+          />
         </div>
         <div class="mx-3 my-2 d-flex gap-2 overflow-x-auto" style="scrollbar-width:none;">
           <button v-for="opt in filterOptions" :key="opt.value"
@@ -43,52 +44,37 @@
     <ion-content class="app-content-wrap">
       <!-- Metric cards -->
       <ion-grid class="mx-2 mt-2 mb-3">
-        <ion-row>
+        <ion-row class="g-2">
           <ion-col size="6" size-sm="3">
-            <ion-card class="mobile-card m-0 h-100">
-              <ion-card-content class="py-3">
-                <small class="text-muted d-block text-xs">Total</small>
-                <div class="fs-6 fw-black text-primary mt-1">{{ reminders.length }}</div>
-              </ion-card-content>
-            </ion-card>
+            <MetricCard title="Total" :value="reminders.length" color="primary" />
           </ion-col>
           <ion-col size="6" size-sm="3">
-            <ion-card class="mobile-card m-0 h-100">
-              <ion-card-content class="py-3">
-                <small class="text-muted d-block text-xs">Hari Ini</small>
-                <div class="fs-6 fw-black text-warning mt-1">{{ todayCount }}</div>
-              </ion-card-content>
-            </ion-card>
+            <MetricCard title="Hari Ini" :value="todayCount" color="warning" />
           </ion-col>
           <ion-col size="6" size-sm="3">
-            <ion-card class="mobile-card m-0 h-100">
-              <ion-card-content class="py-3">
-                <small class="text-muted d-block text-xs">7 Hari</small>
-                <div class="fs-6 fw-black text-success mt-1">{{ week7Count }}</div>
-              </ion-card-content>
-            </ion-card>
+            <MetricCard title="7 Hari" :value="week7Count" color="success" />
           </ion-col>
           <ion-col size="6" size-sm="3">
-            <ion-card class="mobile-card m-0 h-100">
-              <ion-card-content class="py-3">
-                <small class="text-muted d-block text-xs">Berulang</small>
-                <div class="fs-6 fw-black text-indigo mt-1">{{ recurringCount }}</div>
-              </ion-card-content>
-            </ion-card>
+            <MetricCard title="Berulang" :value="recurringCount" color="info" />
           </ion-col>
         </ion-row>
       </ion-grid>
 
       <!-- Empty -->
-      <div v-if="filteredReminders.length === 0" class="empty-state text-center py-5 mobile-card container-padded mx-3 mt-2">
-        <ion-icon :icon="calendarOutline" style="font-size:3rem;" class="mb-2 text-muted" />
-        <p class="text-muted">Belum ada pengingat. Tambah sekarang!</p>
-      </div>
+      <EmptyState
+        v-if="filteredReminders.length === 0"
+        :icon="calendarOutline"
+        title="Belum Ada Pengingat"
+        message="Belum ada pengingat yang tersimpan. Tambah pengingat baru sekarang!"
+        action-text="Tambah Pengingat"
+        action-variant="primary"
+        @action="openDialog()"
+      />
 
       <!-- List -->
       <ion-grid v-else class="mx-2">
         <ion-row>
-          <ion-col v-for="r in filteredReminders" :key="r.id" size="12" size-sm="6" size-lg="4">
+          <ion-col v-for="r in displayedReminders" :key="r.id" size="12" size-sm="6" size-lg="4">
             <ion-card class="mobile-card m-0 mb-3 h-100 reminder-card" :class="getUrgencyClass(r)">
               <ion-card-header class="mobile-card-header">
                 <div class="mobile-card-top">
@@ -132,19 +118,23 @@
             </ion-card>
           </ion-col>
         </ion-row>
+
+        <LoadMoreFooter
+          :has-more="hasMoreReminders"
+          :displayed-count="displayedReminders.length"
+          :total-count="filteredReminders.length"
+          item-name="pengingat"
+          @load-more="loadMoreReminders"
+        />
       </ion-grid>
     </ion-content>
 
     <!-- ── FORM MODAL ───────────────────────────────────────── -->
     <ion-modal :is-open="dialogVisible" @didDismiss="closeDialog">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>{{ editMode ? 'Edit Pengingat' : 'Tambah Pengingat' }}</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="closeDialog"><ion-icon :icon="closeOutline" /></ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
+      <AppModalHeader 
+        :title="editMode ? 'Edit Pengingat' : 'Tambah Pengingat'" 
+        @close="closeDialog" 
+      />
 
       <ion-content class="ion-padding modal-content">
         <div class="form-container mb-4">
@@ -319,11 +309,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
   IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
   IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonCardSubtitle,
-  IonModal, IonAlert, IonFooter, IonGrid, IonRow, IonCol
+  IonModal, IonAlert, IonFooter, IonGrid, IonRow, IonCol,
+  IonInfiniteScroll, IonInfiniteScrollContent
 } from '@ionic/vue'
 import { addOutline, pencilOutline, trashOutline, closeOutline, searchOutline, calendarOutline, notificationsOutline, sparklesOutline } from 'ionicons/icons'
 import {
@@ -506,6 +497,21 @@ const filteredReminders = computed(() => {
       return true
     })
     .sort((a, b) => effectiveDate(a).localeCompare(effectiveDate(b)))
+})
+
+const reminderLimit = ref(24)
+const displayedReminders = computed(() => {
+  return filteredReminders.value.slice(0, reminderLimit.value)
+})
+const hasMoreReminders = computed(() => {
+  return displayedReminders.value.length < filteredReminders.value.length
+})
+const loadMoreReminders = (ev?: any) => {
+  reminderLimit.value += 24
+  if (ev && ev.target) ev.target.complete()
+}
+watch([searchQuery, activeFilter], () => {
+  reminderLimit.value = 24
 })
 
 const todayCount  = computed(() => reminders.value.filter(r => { const n = getNextOccurrence(r); return n ? daysUntil(n) === 0 : false }).length)

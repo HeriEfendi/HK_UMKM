@@ -20,21 +20,25 @@
       <div class="ion-padding">
         <!-- Search bar -->
         <div class="mb-3 px-2">
-          <input 
-            type="text" 
+          <SearchInput 
             v-model="searchQuery" 
-            class="form-control app-control" 
             placeholder="Cari kontak berdasarkan nama atau telepon..." 
+            size="sm" 
           />
         </div>
 
         <div v-if="loading" class="ion-text-center py-5"><ion-spinner /></div>
-        <div v-else-if="filteredUsers.length === 0" class="text-center py-5 text-muted">
-          <ion-icon :icon="peopleOutline" style="font-size: 3rem;" class="mb-2" />
-          <p>Belum ada kontak ditemukan.</p>
-        </div>
+        <EmptyState
+          v-else-if="filteredUsers.length === 0"
+          :icon="peopleOutline"
+          title="Belum Ada Kontak"
+          message="Belum ada kontak yang ditemukan. Tambahkan kontak pelanggan atau supplier pertama Anda!"
+          action-text="Tambah Kontak"
+          action-variant="primary"
+          @action="createUser"
+        />
         <div v-else class="row mx-2">
-          <div v-for="user in filteredUsers" :key="user.id" class="col-12 col-sm-6 col-lg-4 g-2 m-0 mb-1 px-2">
+          <div v-for="user in displayedUsers" :key="user.id" class="col-12 col-sm-6 col-lg-4 g-2 m-0 mb-1 px-2">
             <div class="mobile-card-sm h-100 d-flex align-items-center justify-content-between p-3">
               <div class="d-flex align-items-center" style="flex: 1; min-width: 0;">
                 <ion-avatar slot="start" class="me-3 flex-shrink-0">
@@ -68,20 +72,21 @@
               </div>
             </div>
           </div>
+
+          <LoadMoreFooter
+            :has-more="hasMoreUsers"
+            :displayed-count="displayedUsers.length"
+            :total-count="filteredUsers.length"
+            item-name="kontak"
+            @load-more="loadMoreUsers"
+          />
         </div>
       </div>
     </ion-content>
 
     <!-- Modal Riwayat Transaksi & Buku Utang (M-06) -->
     <ion-modal :is-open="historyModalVisible" @didDismiss="historyModalVisible = false">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>Riwayat: {{ selectedContact?.name }}</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="historyModalVisible = false"><ion-icon :icon="closeOutline" /></ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
+      <AppModalHeader :title="`Riwayat: ${selectedContact?.name || ''}`" @close="historyModalVisible = false" />
 
       <ion-content class="app-content-wrap ion-padding bg-light">
         <div v-if="selectedContact" class="mobile-card p-3 mb-3">
@@ -172,8 +177,8 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
-import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonButtons, IonAvatar, IonImg, IonSpinner, IonIcon, IonModal, onIonViewWillEnter } from '@ionic/vue';
+import { ref, computed, watch } from 'vue'
+import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonButtons, IonAvatar, IonImg, IonSpinner, IonIcon, IonModal, onIonViewWillEnter, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/vue';
 import { addOutline, trashOutline, createOutline, receiptOutline, callOutline, peopleOutline, closeOutline, logoWhatsapp } from 'ionicons/icons';
 import { UsersRepository } from '@/db/usersRepository'
 import { debtsRepo, salesRepo } from '@/db/repositories'
@@ -181,7 +186,11 @@ import UsersEditModal from './EditView.vue'
 
 export default {
   name: 'UsersListView',
-  components: { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonButtons, IonAvatar, IonImg, IonSpinner, IonIcon, IonModal, UsersEditModal },
+  components: { 
+    IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonButtons, 
+    IonAvatar, IonImg, IonSpinner, IonIcon, IonModal, UsersEditModal,
+    IonInfiniteScroll, IonInfiniteScrollContent 
+  },
   setup() {
     const users = ref([])
     const loading = ref(false)
@@ -214,6 +223,21 @@ export default {
         (u.phone && u.phone.includes(q)) ||
         (u.email && u.email.toLowerCase().includes(q))
       )
+    })
+
+    const userLimit = ref(24)
+    const displayedUsers = computed(() => {
+      return filteredUsers.value.slice(0, userLimit.value)
+    })
+    const hasMoreUsers = computed(() => {
+      return displayedUsers.value.length < filteredUsers.value.length
+    })
+    const loadMoreUsers = (ev) => {
+      userLimit.value += 24
+      if (ev && ev.target) ev.target.complete()
+    }
+    watch(searchQuery, () => {
+      userLimit.value = 24
     })
 
     const editUser = (id) => {
@@ -282,7 +306,7 @@ export default {
     onIonViewWillEnter(fetchUsers)
 
     return { 
-      users, loading, searchQuery, filteredUsers, deleteUser, formatDate, formatPrice, isDebtPaid,
+      users, loading, searchQuery, filteredUsers, displayedUsers, hasMoreUsers, loadMoreUsers, deleteUser, formatDate, formatPrice, isDebtPaid,
       addOutline, trashOutline, createOutline, receiptOutline, callOutline, peopleOutline, closeOutline, logoWhatsapp,
       editModalVisible, selectedUserId, editUser, createUser, fetchUsers,
       historyModalVisible, selectedContact, contactDebts, contactSales, openHistoryModal, openWhatsApp
