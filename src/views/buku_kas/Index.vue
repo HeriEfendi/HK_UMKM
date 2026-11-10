@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { onIonViewWillEnter } from '@ionic/vue'
 import { useRouter } from 'vue-router'
 import { db } from '@/db/schema'
 import { migrateProjectTransactions, calcProjectTotals } from '@/db/bukuKasMigration'
-import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle, IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonButtons, IonTitle, IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption, IonProgressBar, IonBadge, IonSpinner, IonAlert, IonFooter, IonSegment, IonSegmentButton } from '@ionic/vue';
+import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle, IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonButtons, IonTitle, IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption, IonProgressBar, IonBadge, IonSpinner, IonAlert, IonFooter, IonSegment, IonSegmentButton, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/vue';
 import AppToast from '@/components/AppToast.vue';
 import { addOutline, trashOutline, pencilOutline, arrowForwardOutline, closeOutline, trendingUpOutline, trendingDownOutline, pieChartOutline, searchOutline } from 'ionicons/icons';
 import { transactionAttachmentsRepo } from '@/db/repositories';
@@ -46,6 +46,22 @@ const filteredProjects = computed(() => {
     const matchesStatus = statusFilter.value === 'ALL' || p.status === statusFilter.value
     return matchesSearch && matchesStatus
   })
+})
+
+const projectLimit = ref(15)
+const displayedProjects = computed(() => {
+  return filteredProjects.value.slice(0, projectLimit.value)
+})
+const hasMoreProjects = computed(() => {
+  return displayedProjects.value.length < filteredProjects.value.length
+})
+const loadMoreProjects = (ev?: any) => {
+  projectLimit.value += 15
+  if (ev && ev.target) ev.target.complete()
+}
+
+watch([searchQuery, statusFilter], () => {
+  projectLimit.value = 15
 })
 
 const totalDepositsAll = computed(() => filteredProjects.value.reduce((acc, p) => acc + p.total_deposits, 0))
@@ -229,34 +245,27 @@ onIonViewWillEnter(fetchProjects)
   <ion-page>
     <ion-header class="app-header">
       <ion-toolbar class="app-toolbar">
-        <div class="app-hero" style="display: flex; flex-direction: column; gap: 8px;">
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <ion-title class="app-hero-title" style="padding: 0;">Buku Kas</ion-title>
-            <ion-buttons style="margin: 0;">
-              <button class="btn btn-action primary btn-md" @click="dialogCreate = true">
-                <ion-icon :icon="addOutline" class="me-1" /> Tambah
-              </button>
+        <div class="app-hero d-flex flex-column gap-2">
+          <div class="d-flex align-items-center justify-content-between">
+            <ion-title class="app-hero-title p-0">Buku Kas</ion-title>
+            <ion-buttons class="m-0">
+              <AppButton variant="primary" size="md" :icon="addOutline" @click="dialogCreate = true">
+                Tambah
+              </AppButton>
             </ion-buttons>
           </div>
-          <p class="app-hero-subtitle" style="margin: 0;">Kelola modal, pengeluaran, dan sisa dana untuk bisnis, hobi, atau renovasi.</p>
+          <p class="app-hero-subtitle m-0">Kelola modal, pengeluaran, dan sisa dana untuk bisnis, hobi, atau renovasi.</p>
         </div>
       </ion-toolbar>
 
       <!-- Search & Filters Segment -->
       <div class="px-3 py-1">
-        <div class="search-input-wrap mb-2 position-relative">
-          <input 
-            type="text" 
-            v-model="searchQuery" 
-            class="form-control form-control-sm app-control" 
-            style="padding-left: 30px;" 
-            placeholder="Cari buku kas..." 
-          />
-          <ion-icon 
-            :icon="searchOutline" 
-            style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 1rem; color: #94a3b8;" 
-          />
-        </div>
+        <SearchInput 
+          v-model="searchQuery" 
+          placeholder="Cari buku kas..." 
+          size="sm" 
+          class="mb-2" 
+        />
         
         <ion-segment v-model="statusFilter" class="custom-segment">
           <ion-segment-button value="ALL">
@@ -277,30 +286,30 @@ onIonViewWillEnter(fetchProjects)
 
     <ion-content fullscreen class="app-content-wrap">
         <ion-grid class="mx-2">
-          <ion-row>
+          <ion-row class="g-2">
             <ion-col size="6" size-sm="4" size-md="3">
-              <ion-card class="mobile-card m-0 h-100">
-                <ion-card-content class="py-3">
-                  <small class="text-muted d-block text-xs">Total Modal</small>
-                  <div class="fs-6 fw-black text-success mt-1">{{ formatCurrency(totalDepositsAll) }}</div>
-                </ion-card-content>
-              </ion-card>
+              <MetricCard 
+                title="Total Modal" 
+                :value="formatCurrency(totalDepositsAll)" 
+                color="success" 
+                :icon="trendingUpOutline" 
+              />
             </ion-col>
             <ion-col size="6" size-sm="4" size-md="3">
-              <ion-card class="mobile-card m-0 h-100">
-                <ion-card-content class="py-3">
-                  <small class="text-muted d-block text-xs">Total Pengeluaran</small>
-                  <div class="fs-6 fw-black text-danger mt-1">{{ formatCurrency(totalExpensesAll) }}</div>
-                </ion-card-content>
-              </ion-card>
+              <MetricCard 
+                title="Total Pengeluaran" 
+                :value="formatCurrency(totalExpensesAll)" 
+                color="danger" 
+                :icon="trendingDownOutline" 
+              />
             </ion-col>
             <ion-col size="12" size-sm="4" size-md="6" size-lg="3">
-              <ion-card class="mobile-card m-0 h-100">
-                <ion-card-content class="py-3">
-                  <small class="text-muted d-block text-xs">Total Sisa Saldo</small>
-                  <div class="fs-6 fw-black text-primary mt-1">{{ formatCurrency(totalBalanceAll) }}</div>
-                </ion-card-content>
-              </ion-card>
+              <MetricCard 
+                title="Total Sisa Saldo" 
+                :value="formatCurrency(totalBalanceAll)" 
+                :color="totalBalanceAll >= 0 ? 'primary' : 'danger'" 
+                :icon="pieChartOutline" 
+              />
             </ion-col>
           </ion-row>
         </ion-grid>
@@ -310,13 +319,19 @@ onIonViewWillEnter(fetchProjects)
           <p>Memuat buku kas...</p>
         </div>
 
-        <div v-else-if="filteredProjects.length === 0" class="empty-state text-center py-5 text-muted">
-          <p>Tidak ada buku kas yang ditemukan</p>
-        </div>
+        <EmptyState
+          v-else-if="filteredProjects.length === 0"
+          :icon="pieChartOutline"
+          title="Belum Ada Buku Kas"
+          message="Tidak ada buku kas yang ditemukan. Buat buku kas baru untuk mulai mencatat."
+          action-text="Tambah Buku Kas"
+          action-variant="primary"
+          @action="dialogCreate = true"
+        />
 
         <ion-grid v-else class="mx-2">
           <ion-row>
-            <ion-col v-for="project in filteredProjects" :key="project.id" size="12" size-sm="6" size-lg="4">
+            <ion-col v-for="project in displayedProjects" :key="project.id" size="12" size-sm="6" size-lg="4">
               <ion-card class="mobile-card m-0 mb-3" @click="goToDetail(project.id)">
                 <ion-card-header>
                   <div class="mobile-card-top">
@@ -364,6 +379,14 @@ onIonViewWillEnter(fetchProjects)
               </ion-card>
             </ion-col>
           </ion-row>
+
+          <LoadMoreFooter
+            :has-more="hasMoreProjects"
+            :displayed-count="displayedProjects.length"
+            :total-count="filteredProjects.length"
+            item-name="buku kas"
+            @load-more="loadMoreProjects"
+          />
         </ion-grid>
         <AppToast 
           :is-open="snackbar.show" 
@@ -384,38 +407,45 @@ onIonViewWillEnter(fetchProjects)
     </ion-content>
 
     <ion-modal :is-open="dialogCreate || dialogEdit" @didDismiss="closeModal">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>{{ dialogEdit ? 'Edit Buku Kas' : 'Tambah Buku Kas' }}</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="closeModal"><ion-icon :icon="closeOutline" /></ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
+      <AppModalHeader 
+        :title="dialogEdit ? 'Edit Buku Kas' : 'Tambah Buku Kas'" 
+        @close="closeModal" 
+      />
       <ion-content class="ion-padding modal-content">
         <div class="form-container mb-4">
-          <div class="form-section">
-            <label class="form-label">Nama</label>
-            <input type="text" v-model="activeProject.name" class="form-control app-control" />
-          </div>
-          <div class="form-section">
-            <label class="form-label">Status</label>
+          <AppInput 
+            v-model="activeProject.name" 
+            label="Nama Buku Kas" 
+            placeholder="Contoh: Operasional Toko, Renovasi..." 
+            required 
+          />
+
+          <div class="form-section mb-3">
+            <label class="form-label mb-1 fw-semibold small">Status</label>
             <select v-model="activeProject.status" class="form-control app-control">
               <option value="Active">Aktif</option>
               <option value="Completed">Selesai</option>
               <option value="Pending">Tunda</option>
             </select>
           </div>
-          <div class="form-section">
-            <label class="form-label">Deskripsi</label>
-            <textarea v-model="activeProject.description" rows="3" class="form-control app-control"></textarea>
-          </div>
+
+          <AppInput 
+            v-model="activeProject.description" 
+            label="Deskripsi" 
+            type="textarea" 
+            :rows="3" 
+            placeholder="Catatan tambahan tentang buku kas ini..." 
+          />
         </div>
       </ion-content>
       <ion-footer>
-        <div class="form-actions p-3">
-          <button type="button" class="btn btn-action light w-100" @click="closeModal">Cancel</button>
-          <button type="button" class="btn btn-action primary w-100 mt-2" @click="dialogEdit ? updateProject() : createProject()">Save Changes</button>
+        <div class="form-actions p-3 d-flex flex-column gap-2">
+          <AppButton variant="primary" block :loading="submitting" @click="dialogEdit ? updateProject() : createProject()">
+            Simpan Perubahan
+          </AppButton>
+          <AppButton variant="light" block @click="closeModal">
+            Batal
+          </AppButton>
         </div>
       </ion-footer>
     </ion-modal>

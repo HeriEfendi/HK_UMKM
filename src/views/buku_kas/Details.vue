@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx'
 import { useRoute } from 'vue-router'
 import { db } from '@/db/schema'
 import { migrateProjectTransactions, getTransactionsByProject, calcProjectTotals } from '@/db/bukuKasMigration'
-import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle, IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonButtons, IonTitle, IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption, IonProgressBar, IonBadge, IonSpinner, IonList, IonListHeader, IonAlert, IonFooter, IonSegment, IonSegmentButton, IonBackButton } from '@ionic/vue';
+import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle, IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonButtons, IonTitle, IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption, IonProgressBar, IonBadge, IonSpinner, IonList, IonListHeader, IonAlert, IonFooter, IonSegment, IonSegmentButton, IonBackButton, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/vue';
 import { addOutline, trashOutline, pencilOutline, closeOutline, cloudUploadOutline, cloudDownloadOutline, listOutline, checkmarkCircleOutline, searchOutline, arrowBackOutline, cameraOutline, imageOutline, eyeOutline, documentAttachOutline } from 'ionicons/icons';
 import { CHART_PALETTE, formatIDR, formatCompactNumber, getModernTooltip, getDonutTooltip } from '@/utils/chartThemes'
 import AppToast from '@/components/AppToast.vue'
@@ -119,6 +119,24 @@ const filteredTransactions = computed(() => {
     const typeB = b.type === 'EXPENSE' ? -1 : 1
     return typeA - typeB
   })
+})
+
+const txDisplayLimit = ref(25)
+const displayedTransactions = computed(() => {
+  return filteredTransactions.value.slice(0, txDisplayLimit.value)
+})
+const hasMoreTransactions = computed(() => {
+  return displayedTransactions.value.length < filteredTransactions.value.length
+})
+const loadMoreTransactions = (ev?: any) => {
+  txDisplayLimit.value += 25
+  if (ev && ev.target) {
+    ev.target.complete()
+  }
+}
+
+watch([txSearchQuery, filterType], () => {
+  txDisplayLimit.value = 25
 })
 
 const netProfit = computed(() => (((project.value as any)?.panen_total || 0) - (project.value?.total_expenses || 0)))
@@ -1071,19 +1089,11 @@ onMounted(async () => {
           <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between">
             <!-- Search input -->
             <div class="w-100 px-3 py-1 search-container">
-              <div class="search-input-wrap position-relative">
-                <input 
-                  type="text" 
-                  v-model="txSearchQuery" 
-                  class="form-control form-control-sm app-control" 
-                  style="padding-left: 30px;" 
-                  placeholder="Cari transaksi..." 
-                />
-                <ion-icon 
-                  :icon="searchOutline" 
-                  style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 1rem; color: #94a3b8;" 
-                />
-              </div>
+              <SearchInput 
+                v-model="txSearchQuery" 
+                placeholder="Cari transaksi..." 
+                size="sm" 
+              />
             </div>
 
             <!-- Filter chips -->
@@ -1105,53 +1115,64 @@ onMounted(async () => {
 
           <!-- Transactions list -->
           <div class="px-3 py-2">
-            <div v-if="filteredTransactions.length === 0" class="text-center text-muted py-5">
-              <p>Tidak ada transaksi ditemukan</p>
-            </div>
+            <EmptyState
+              v-if="filteredTransactions.length === 0"
+              :icon="listOutline"
+              title="Tidak Ada Transaksi"
+              message="Tidak ada transaksi yang cocok dengan filter atau kata kunci pencarian."
+            />
 
-            <div class="transaction-scroll pb-2">
-            <div class="transaction-list d-flex flex-column gap-1">
-              <template v-for="tx in filteredTransactions" :key="tx.id">
-                <ion-card class="transaction-card">
-                <div class="transaction-inner d-flex align-items-center" :class="tx.type === 'DEPOSIT' ? 'deposit-bg' : 'expense-bg'">
-                  <div class="transaction-meta ms-2">
-                    <span class="fw-bold" :class="{ 'text-success': tx.type === 'DEPOSIT', 'text-danger': tx.type === 'EXPENSE' }">
-                      {{ tx.type === 'DEPOSIT' ? '▲ In' : '▼ Out' }}
-                    </span>
-                    <small class="text-muted d-block">{{ formatDate(tx.date) }}</small>
-                  </div>
-                  <div class="transaction-main text-truncate px-1">
-                    <div class="d-flex align-items-center gap-1 text-truncate">
-                      <span class="fw-bold text-truncate">{{ tx.category }}</span>
-                      <button
-                        v-if="tx.hasAttachment"
-                        type="button"
-                        class="badge bg-success border-0 text-white d-inline-flex align-items-center gap-1 cursor-pointer py-1 px-2 flex-shrink-0"
-                        style="font-size: 9px; cursor: pointer;"
-                        @click.stop="viewReceipt(tx)"
-                        title="Lihat Foto Nota"
-                      >
-                        <ion-icon :icon="documentAttachOutline" /> Nota
+            <div v-else class="transaction-scroll pb-2">
+              <div class="transaction-list d-flex flex-column gap-1">
+                <template v-for="tx in displayedTransactions" :key="tx.id">
+                  <ion-card class="transaction-card">
+                  <div class="transaction-inner d-flex align-items-center" :class="tx.type === 'DEPOSIT' ? 'deposit-bg' : 'expense-bg'">
+                    <div class="transaction-meta ms-2">
+                      <span class="fw-bold" :class="{ 'text-success': tx.type === 'DEPOSIT', 'text-danger': tx.type === 'EXPENSE' }">
+                        {{ tx.type === 'DEPOSIT' ? '▲ In' : '▼ Out' }}
+                      </span>
+                      <small class="text-muted d-block">{{ formatDate(tx.date) }}</small>
+                    </div>
+                    <div class="transaction-main text-truncate px-1">
+                      <div class="d-flex align-items-center gap-1 text-truncate">
+                        <span class="fw-bold text-truncate">{{ tx.category }}</span>
+                        <button
+                          v-if="tx.hasAttachment"
+                          type="button"
+                          class="badge bg-success border-0 text-white d-inline-flex align-items-center gap-1 cursor-pointer py-1 px-2 flex-shrink-0"
+                          style="font-size: 9px; cursor: pointer;"
+                          @click.stop="viewReceipt(tx)"
+                          title="Lihat Foto Nota"
+                        >
+                          <ion-icon :icon="documentAttachOutline" /> Nota
+                        </button>
+                      </div>
+                      <div class="text-muted text-truncate">{{ tx.description || '-' }}</div>
+                    </div>
+                    <div class="transaction-amount text-end fw-bold me-2" :class="{ 'text-success': tx.type === 'DEPOSIT', 'text-danger': tx.type === 'EXPENSE' }">
+                      {{ tx.type === 'DEPOSIT' ? '+' : '-' }}{{ formatCurrency(tx.amount) }}
+                    </div>
+                    <div class="transaction-actions flex-shrink-0 d-flex justify-content-end gap-2">
+                      <button class="btn btn-light btn-md text-primary" @click="openEditDialog(tx)" title="Edit">
+                        <ion-icon :icon="pencilOutline" />
+                      </button>
+                      <button class="btn btn-light btn-md text-danger" @click="dialogDeleteTxId = tx.id" title="Hapus">
+                        <ion-icon :icon="trashOutline" />
                       </button>
                     </div>
-                    <div class="text-muted text-truncate">{{ tx.description || '-' }}</div>
                   </div>
-                  <div class="transaction-amount text-end fw-bold me-2" :class="{ 'text-success': tx.type === 'DEPOSIT', 'text-danger': tx.type === 'EXPENSE' }">
-                    {{ tx.type === 'DEPOSIT' ? '+' : '-' }}{{ formatCurrency(tx.amount) }}
-                  </div>
-                  <div class="transaction-actions flex-shrink-0 d-flex justify-content-end gap-2">
-                    <button class="btn btn-light btn-md text-primary" @click="openEditDialog(tx)" title="Edit">
-                      <ion-icon :icon="pencilOutline" />
-                    </button>
-                    <button class="btn btn-light btn-md text-danger" @click="dialogDeleteTxId = tx.id" title="Hapus">
-                      <ion-icon :icon="trashOutline" />
-                    </button>
-                  </div>
-                </div>
-              </ion-card>
-              </template>
+                </ion-card>
+                </template>
+              </div>
+
+              <LoadMoreFooter
+                :has-more="hasMoreTransactions"
+                :displayed-count="displayedTransactions.length"
+                :total-count="filteredTransactions.length"
+                item-name="transaksi"
+                @load-more="loadMoreTransactions"
+              />
             </div>
-          </div>
           
 
 
@@ -1205,14 +1226,10 @@ onMounted(async () => {
 
     <!-- Dialogs -->
     <ion-modal :is-open="dialogTransaction" @didDismiss="closeDialog">
-        <ion-header>
-            <ion-toolbar>
-                <ion-title>{{ editingTxId ? 'Edit Transaksi' : 'Tambah Transaksi' }}</ion-title>
-                <ion-buttons slot="end">
-                    <ion-button @click="closeDialog"><ion-icon :icon="closeOutline" /></ion-button>
-                </ion-buttons>
-            </ion-toolbar>
-        </ion-header>
+      <AppModalHeader 
+        :title="editingTxId ? 'Edit Transaksi' : 'Tambah Transaksi'" 
+        @close="closeDialog" 
+      />
         <ion-content class="ion-padding modal-content">
             <div class="form-container">
                 <div class="form-section">

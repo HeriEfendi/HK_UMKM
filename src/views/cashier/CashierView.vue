@@ -164,19 +164,11 @@
         <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between mb-3">
           <!-- Search input -->
           <div class="w-100 px-3 py-1 search-container">
-            <div class="search-input-wrap position-relative">
-              <input 
-                type="text" 
-                v-model="searchQuery" 
-                class="form-control form-control-sm app-control" 
-                style="padding-left: 30px;" 
-                placeholder="Cari produk..." 
-              />
-              <ion-icon 
-                :icon="searchOutline" 
-                style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 1rem; color: #94a3b8;" 
-              />
-            </div>
+            <SearchInput 
+              v-model="searchQuery" 
+              placeholder="Cari produk..." 
+              size="sm" 
+            />
           </div>
 
           <!-- Category filter chips -->
@@ -203,14 +195,17 @@
         </div>
 
             <!-- Products Grid -->
-            <div v-if="filteredProducts.length === 0" class="empty-state text-center py-5 mobile-card container-padded">
-              <ion-icon :icon="basketOutline" style="font-size: 3rem;" class="text-muted mb-2" />
-              <p class="text-muted">Tidak ada produk tersedia.</p>
-            </div>
+            <EmptyState
+              v-if="filteredProducts.length === 0"
+              :icon="basketOutline"
+              title="Belum Ada Produk"
+              message="Tidak ada produk yang cocok dengan pencarian atau kategori ini."
+              class="mobile-card container-padded"
+            />
 
             <div v-else class="row mx-1">
               <div 
-                v-for="product in filteredProducts" 
+                v-for="product in displayedProducts" 
                 :key="product.id" 
                 class="col-12 col-md-6 mb-2 px-1"
               >
@@ -240,6 +235,15 @@
                   </div>
                 </div>
               </div>
+
+              <LoadMoreFooter
+                v-if="activeTab === 'pos'"
+                :has-more="hasMoreProducts"
+                :displayed-count="displayedProducts.length"
+                :total-count="filteredProducts.length"
+                item-name="produk"
+                @load-more="loadMoreProducts"
+              />
             </div>
           </ion-col>
         </div>
@@ -343,15 +347,17 @@
           </button>
         </div>
 
-        <div v-if="salesHistory.length === 0" class="d-flex justify-content-between align-items-center mx-3 mb-3">
-          <ion-icon :icon="calendarOutline" style="font-size: 3rem;" class="mb-2" />
-          <p>Belum ada riwayat transaksi penjualan.</p>
-        </div>
+        <EmptyState
+          v-if="salesHistory.length === 0"
+          :icon="calendarOutline"
+          title="Belum Ada Riwayat Transaksi"
+          message="Belum ada riwayat transaksi penjualan yang tercatat."
+        />
 
         <!-- Transaction Cards -->
         <div v-else class="row mx-2 mb-2">
           <div 
-            v-for="sale in salesHistory" 
+            v-for="sale in displayedSales" 
             :key="sale.id" 
             class="col-12 col-sm-6 col-lg-4 g-0 m-0 mb-3"
           >
@@ -390,6 +396,15 @@
               </div>
             </div>
           </div>
+
+          <LoadMoreFooter
+            v-if="activeTab === 'riwayat'"
+            :has-more="hasMoreSales"
+            :displayed-count="displayedSales.length"
+            :total-count="salesHistory.length"
+            item-name="riwayat transaksi"
+            @load-more="loadMoreSales"
+          />
         </div>
       </div>
     </ion-content>
@@ -710,7 +725,7 @@
 import { ref, onMounted, computed, defineAsyncComponent, watch, nextTick } from 'vue'
 import { ProductRepository, CategoryRepository, salesRepo, stockMutationsRepo } from '../../db/repositories'
 import { businessProfile, BusinessProfileRepository } from '../../db/businessProfile'
-import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonSegment, IonSegmentButton, IonLabel, IonButtons, IonBackButton, IonModal, IonAlert, toastController, IonGrid, IonRow, IonCol, IonCard, IonCardContent, onIonViewWillEnter } from '@ionic/vue';
+import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, IonSegment, IonSegmentButton, IonLabel, IonButtons, IonBackButton, IonModal, IonAlert, toastController, IonGrid, IonRow, IonCol, IonCard, IonCardContent, onIonViewWillEnter, IonInfiniteScroll, IonInfiniteScrollContent } from '@ionic/vue';
 import { addOutline, removeOutline, trashOutline, cartOutline, basketOutline, printOutline, downloadOutline, calendarOutline, documentTextOutline, logoWhatsapp, searchOutline as searchIcon } from 'ionicons/icons';
 import { readProductImage } from '../../composables/useProductImage';
 import * as XLSX from 'xlsx';
@@ -722,7 +737,8 @@ export default {
   components: { 
     IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButton, IonIcon, 
     IonSegment, IonSegmentButton, IonLabel, IonButtons, IonBackButton, IonModal, IonAlert,
-    IonGrid, IonRow, IonCol, IonCard, IonCardContent
+    IonGrid, IonRow, IonCol, IonCard, IonCardContent,
+    IonInfiniteScroll, IonInfiniteScrollContent
   },
   setup() {
     const activeTab = ref('pos')
@@ -797,6 +813,40 @@ export default {
         const matchesCategory = selectedCategory.value === 'all' || p.categoryId === selectedCategory.value
         return matchesSearch && matchesCategory
       })
+    })
+
+    // Lazy load state for sales history
+    const salesLimit = ref(20)
+    const displayedSales = computed(() => {
+      return salesHistory.value.slice(0, salesLimit.value)
+    })
+    const hasMoreSales = computed(() => {
+      return displayedSales.value.length < salesHistory.value.length
+    })
+    const loadMoreSales = (ev) => {
+      salesLimit.value += 20
+      if (ev && ev.target) {
+        ev.target.complete()
+      }
+    }
+
+    // Lazy load state for POS products catalog
+    const productLimit = ref(24)
+    const displayedProducts = computed(() => {
+      return filteredProducts.value.slice(0, productLimit.value)
+    })
+    const hasMoreProducts = computed(() => {
+      return displayedProducts.value.length < filteredProducts.value.length
+    })
+    const loadMoreProducts = (ev) => {
+      productLimit.value += 24
+      if (ev && ev.target) {
+        ev.target.complete()
+      }
+    }
+
+    watch([searchQuery, selectedCategory], () => {
+      productLimit.value = 24
     })
 
     const storeProfile = businessProfile
@@ -1309,6 +1359,12 @@ export default {
       formatPrice,
       getCategoryName,
       filteredProducts,
+      displayedProducts,
+      hasMoreProducts,
+      loadMoreProducts,
+      displayedSales,
+      hasMoreSales,
+      loadMoreSales,
       cartCount,
       subtotal,
       discountAmount,
